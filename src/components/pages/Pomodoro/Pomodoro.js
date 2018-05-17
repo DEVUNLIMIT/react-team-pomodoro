@@ -1,9 +1,20 @@
+import env from './env';
 import React from 'react';
 // import { Link } from 'react-router-dom';
+
 import Mousetrap from 'mousetrap';
 import { Helmet } from 'react-helmet';
 
+import moment from 'moment';
+
 import './Pomodoro.scss';
+
+import * as firebase from 'firebase';
+import Rebase from 're-base';
+
+var base = Rebase.createClass(firebase.initializeApp({ ...env }).database());
+
+const dummyUserId = 'h44KLR70'
 
 class Pomodoro extends React.Component {
     constructor() {
@@ -23,9 +34,38 @@ class Pomodoro extends React.Component {
         this.reset = this.reset.bind(this);
         this.play = this.play.bind(this);
         this.elapseTime = this.elapseTime.bind(this);
+
+        window.addEventListener('beforeunload', (e) => {
+          base.update(`users/${dummyUserId}`, {
+            data: {
+              online: false
+            }
+          })
+        });
+    }
+
+    componentWillUnmount() {
+      //
+    }
+
+    componentWillMount() {
+      base.update('users/h44KLR70', {
+        data: {
+          online: true
+        }
+      });
     }
 
     componentDidMount() {
+      let currentWeekNo = moment().week();
+      base.listenTo(`users/${dummyUserId}/pomoCount/2018/${currentWeekNo}`, {
+        context: this,
+        asArray: false,
+        then(data){
+          // console.log(data);
+        }
+      });
+
       this.setDefaultTime();
       this.startShortcuts();
       Notification.requestPermission();
