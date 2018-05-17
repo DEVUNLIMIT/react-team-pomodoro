@@ -7,6 +7,5 @@ forked from [afonsopacifer/react-pomodoro](https://github.com/afonsopacifer/reac
 - React Router v4
 - Sass
 - React Pomodoro
-
 - Firebase
 - Google Login

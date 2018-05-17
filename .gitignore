@@ -10,7 +10,7 @@
 /build
 
 # Database
-/src/**/env.*
+firebase.conf.*
 
 # misc
 .DS_Store

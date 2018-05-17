@@ -1,4 +1,3 @@
-import env from './env';
 import React from 'react';
 // import { Link } from 'react-router-dom';
 
@@ -9,10 +8,11 @@ import moment from 'moment';
 
 import './Pomodoro.scss';
 
+import firebaseConf from './firebase.conf';
 import * as firebase from 'firebase';
 import Rebase from 're-base';
 
-var base = Rebase.createClass(firebase.initializeApp({ ...env }).database());
+var base = Rebase.createClass(firebase.initializeApp({ ...firebaseConf }).database());
 
 const dummyUserId = 'h44KLR70'
 
