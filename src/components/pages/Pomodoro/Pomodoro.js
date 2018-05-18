@@ -10,6 +10,7 @@ import './Pomodoro.scss';
 
 import firebaseConf from './firebase.conf';
 import * as firebase from 'firebase';
+
 import Rebase from 're-base';
 
 var base = Rebase.createClass(firebase.initializeApp({ ...firebaseConf }).database());
@@ -18,30 +19,39 @@ const dummyUserId = 'h44KLR70'
 
 class Pomodoro extends React.Component {
     constructor() {
-        super();
-    
-        this.state = {
-            time: 0,
-            play: false,
-            timeType: 0,
-            title: ''
-        };
+      super();
+  
+      this.state = {
+          // OAuth
+          isAuthenticated: false,
+          token: 0,
+          uid: 0,
+          name: 0,
 
-        // Bind early, avoid function creation on render loop
-        this.setTimeForCode = this.setTime.bind(this, 1500);
-        this.setTimeForSocial = this.setTime.bind(this, 300);
-        this.setTimeForCoffee = this.setTime.bind(this, 900);
-        this.reset = this.reset.bind(this);
-        this.play = this.play.bind(this);
-        this.elapseTime = this.elapseTime.bind(this);
+          // Pomodoro
+          time: 0,
+          play: false,
+          timeType: 0,
+          title: ''
+      };
 
-        window.addEventListener('beforeunload', (e) => {
-          base.update(`users/${dummyUserId}`, {
-            data: {
-              online: false
-            }
-          })
-        });
+      // Bind early, avoid function creation on render loop
+      this.setTimeForCode = this.setTime.bind(this, 1500);
+      this.setTimeForSocial = this.setTime.bind(this, 300);
+      this.setTimeForCoffee = this.setTime.bind(this, 900);
+      this.reset = this.reset.bind(this);
+      this.play = this.play.bind(this);
+      this.elapseTime = this.elapseTime.bind(this);
+
+      
+
+      window.addEventListener('beforeunload', (e) => {
+        base.update(`users/${dummyUserId}`, {
+          data: {
+            online: false
+          }
+        })
+      });
     }
 
     componentWillUnmount() {
@@ -49,6 +59,33 @@ class Pomodoro extends React.Component {
     }
 
     componentWillMount() {
+
+      let authSuccess = (token, user) => this.authSuccess(token, user);
+      let authFailure = (errorCode, errorMessage, email, credential) => this.authFailure(errorCode, errorMessage, email, credential);
+
+      firebase.auth().getRedirectResult().then(function(result) {
+        if (result.credential) {
+          // This gives you a Google Access Token. You can use it to access the Google API.
+          var token = result.credential.accessToken;
+          // ...
+        }
+        // The signed-in user info.
+        var user = result.user;
+
+        authSuccess(token, user);
+      }).catch(function(error) {
+        // Handle Errors here.
+        var errorCode = error.code;
+        var errorMessage = error.message;
+        // The email of the user's account used.
+        var email = error.email;
+        // The firebase.auth.AuthCredential type that was used.
+        var credential = error.credential;
+        // ...
+
+        authFailure(errorCode, errorMessage, email, credential);
+      });
+
       base.update('users/h44KLR70', {
         data: {
           online: true
@@ -69,6 +106,26 @@ class Pomodoro extends React.Component {
       this.setDefaultTime();
       this.startShortcuts();
       Notification.requestPermission();
+    }
+
+    auth(site) {
+      if(site === 'google') {
+        firebase.auth().useDeviceLanguage();
+        firebase.auth().signInWithRedirect(new firebase.auth.GoogleAuthProvider());
+      }
+    }
+
+    authSuccess(token, user) {
+      this.setState({
+        isAuthenticated: true,
+        token: token,
+        uid: user.uid,
+        name: user.displayName
+      });
+    }
+
+    authFailure(errorCode, errorMessage, email, credential) {
+      
     }
   
     elapseTime() {
@@ -236,6 +293,8 @@ class Pomodoro extends React.Component {
               {/* Main section
               ------------------------------- */}
               <div className="main">
+
+              <button type="button" style={{ position: 'absolute', top: '50%', right: '10%' }} onClick={() => this.auth('google')}>Google Auth { this.state.isAuthenticated ? 'true' : 'false' }</button>
 
               <div className="container display timer">
                   <span className="time">{this.format(this.state.time)}</span>
