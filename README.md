@@ -8,4 +8,4 @@ forked from [afonsopacifer/react-pomodoro](https://github.com/afonsopacifer/reac
 - Sass
 - React Pomodoro
 - Firebase
-- Google Login
+- Firebase Auth

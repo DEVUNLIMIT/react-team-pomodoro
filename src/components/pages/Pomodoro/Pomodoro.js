@@ -13,9 +13,8 @@ import * as firebase from 'firebase';
 
 import Rebase from 're-base';
 
-var base = Rebase.createClass(firebase.initializeApp({ ...firebaseConf }).database());
-
-const dummyUserId = 'h44KLR70'
+const app = firebase.initializeApp({ ...firebaseConf });
+const base = Rebase.createClass(app.database());
 
 class Pomodoro extends React.Component {
     constructor() {
@@ -23,12 +22,14 @@ class Pomodoro extends React.Component {
   
       this.state = {
           // OAuth
-          isAuthenticated: false,
-          token: 0,
-          uid: 0,
-          name: 0,
+          isAuthenticated: localStorage.getItem('isAuthenticated') || false,
+          uid: null,
+          name: null,
+          picture: null,
+          pomo: 0,
 
           // Pomodoro
+          weekOfYear: moment().week(),
           time: 0,
           play: false,
           timeType: 0,
@@ -43,95 +44,155 @@ class Pomodoro extends React.Component {
       this.play = this.play.bind(this);
       this.elapseTime = this.elapseTime.bind(this);
 
-      
-
       window.addEventListener('beforeunload', (e) => {
-        base.update(`users/${dummyUserId}`, {
-          data: {
-            online: false
-          }
-        })
+        if(this.state.isAuthenticated && this.state.uid) {
+          base.update(`users/${this.state.uid}`, {
+            data: {
+              online: false,
+              state: false
+            }
+          })
+        }
       });
-    }
-
-    componentWillUnmount() {
-      //
     }
 
     componentWillMount() {
-
-      let authSuccess = (token, user) => this.authSuccess(token, user);
-      let authFailure = (errorCode, errorMessage, email, credential) => this.authFailure(errorCode, errorMessage, email, credential);
-
-      firebase.auth().getRedirectResult().then(function(result) {
-        if (result.credential) {
-          // This gives you a Google Access Token. You can use it to access the Google API.
-          var token = result.credential.accessToken;
-          // ...
-        }
-        // The signed-in user info.
-        var user = result.user;
-
-        authSuccess(token, user);
-      }).catch(function(error) {
-        // Handle Errors here.
-        var errorCode = error.code;
-        var errorMessage = error.message;
-        // The email of the user's account used.
-        var email = error.email;
-        // The firebase.auth.AuthCredential type that was used.
-        var credential = error.credential;
-        // ...
-
-        authFailure(errorCode, errorMessage, email, credential);
-      });
-
-      base.update('users/h44KLR70', {
-        data: {
-          online: true
+      firebase.auth().onAuthStateChanged((user) => {
+        if (user) {
+          this.setAuthenticate(true);
+          this.setState({
+            name: user.displayName,
+            uid: user.uid,
+            picture: user.photoURL
+          })
+          
+          base.update(`/users/${user.uid}`, {
+            data: {
+              online: true
+            }
+          });
+          base.syncState(`/users/${user.uid}/pomo`, {
+            context: this,
+            state: 'pomo',
+            asArray: false
+          })
+        } else {
+          this.setAuthenticate(false);
         }
       });
     }
 
     componentDidMount() {
-      let currentWeekNo = moment().week();
-      base.listenTo(`users/${dummyUserId}/pomoCount/2018/${currentWeekNo}`, {
-        context: this,
-        asArray: false,
-        then(data){
-          // console.log(data);
-        }
-      });
+      if(this.state.isAuthenticated) {
+        base.syncState('users', {
+          context: this,
+          state: 'users',
+          asArray: true
+        });
+      }
 
+      // Pomodoro
       this.setDefaultTime();
       this.startShortcuts();
       Notification.requestPermission();
     }
 
-    auth(site) {
-      if(site === 'google') {
-        firebase.auth().useDeviceLanguage();
-        firebase.auth().signInWithRedirect(new firebase.auth.GoogleAuthProvider());
+    auth() {
+      if(this.state.isAuthenticated) {
+        base.update(`users/${this.state.uid}`, {
+          data: {
+            online: false,
+            state: false
+          }
+        });
+        firebase.auth().signOut();
+        this.setAuthenticate(false);
+      } else {
+        firebase.auth().languageCode = 'kr';
+        firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider())
+        .then(result => {
+          let user = result.user;
+          this.setAuthenticate(true);
+
+          if(result.additionalUserInfo.isNewUser) {
+            this.addNewUser(user);
+          } else {
+            base.update(`users/${user.uid}`, {
+              data: {
+                online: true,
+                state: false
+              }
+            });
+          }
+
+          this.setState({
+            name: user.displayName,
+            picture: user.photoURL,
+            uid: user.uid
+          });
+        })
+        .catch(error => {
+          this.setAuthenticate(false);
+        });
       }
     }
 
-    authSuccess(token, user) {
-      this.setState({
-        isAuthenticated: true,
-        token: token,
-        uid: user.uid,
-        name: user.displayName
+    addNewUser(user) {
+      base.post(`users/${user.uid}`, {
+        data: {
+          name: user.displayName,
+          picture: user.photoURL,
+          online: false,
+          state: false,
+        },
+        then(err) {
+          if(!err) {
+            base.update(`users/${user.uid}`, {
+              data: {
+                online: true,
+                state: false
+              }
+            });
+          }
+        }
       });
+      
+      this.setAuthenticate(true);
     }
 
-    authFailure(errorCode, errorMessage, email, credential) {
-      
+    setAuthenticate(bool) {
+      this.setState({ isAuthenticated: bool });
+      localStorage.setItem('isAuthenticated', bool);
     }
-  
+
+    donePomo() {
+      let vData = {};
+
+      base.fetch(`users/${this.state.uid}/pomo/${this.state.weekOfYear}`, {
+        context: this,
+        asArray: false,
+        then(data) {
+          if(typeof data === 'object') {
+            vData[this.state.weekOfYear] = 1;
+            base.post(`users/${this.state.uid}/pomo`, {
+              data: vData
+            });
+          } else {
+            vData[this.state.weekOfYear] = ++data;
+            base.update(`users/${this.state.uid}/pomo`, {
+              data: vData
+            });
+          }
+        }
+      });
+    }
+    
+    // Pomodoro
     elapseTime() {
       if (this.state.time === 0) {
         this.reset(0);
         this.alert();
+        if(this.state.timeType === 1500) this.donePomo();
       }
       if (this.state.play === true) {
         let newState = this.state.time - 1;
@@ -178,12 +239,28 @@ class Pomodoro extends React.Component {
       this.setState({ 
         play: true 
       });
+
+      if(this.state.isAuthenticated && this.state.timeType === 1500) {
+        base.update(`users/${this.state.uid}`, {
+          data: {
+            state: true
+          }
+        });
+      }
     }
   
     reset(resetFor = this.state.time) {
       clearInterval(this.interval);
       this.format(resetFor);
       this.setState({play: false});
+
+      if(this.state.isAuthenticated && this.state.timeType === 1500) {
+        base.update(`users/${this.state.uid}`, {
+          data: {
+            state: false
+          }
+        });
+      }
     }
   
     togglePlay() {
@@ -196,12 +273,18 @@ class Pomodoro extends React.Component {
   
     setTime(newTime) {
       this.restartInterval();
+
+      base.update(`users/${this.state.uid}`, {
+        data: {
+          state: false
+        }
+      });
       
       this.setState({
         time: newTime, 
         timeType: newTime, 
         title: this.getTitle(newTime), 
-        play: true
+        play: false
       });
     }
   
@@ -292,9 +375,57 @@ class Pomodoro extends React.Component {
               </Helmet>
               {/* Main section
               ------------------------------- */}
-              <div className="main">
+              {
+                this.state.isAuthenticated && this.state.users &&
+                <div className="dashboard">
+                  <div className={ `user-card is-own ${this.state.play ? 'is-active' : 'is-inactive'}` }>
+                    <div className="profile-pic-area">
+                      <img className="profile-pic" src={ this.state.picture } alt="" />
+                    </div>
+                    <div className="profile-info-area">
+                      <strong>
+                        { this.state.name }
+                      </strong>
+                      <br />
+                      online - { this.state.playTime === 1500 && this.state.play ? 'active' : 'inactive' }
+                      <br />
+                      {
+                        this.state.pomo[this.state.weekOfYear]
+                        ? this.state.pomo[this.state.weekOfYear] + ' pomos this week'
+                        : 'no pomos this week'
+                      }
+                    </div>
+                  </div>
+                  {
+                    this.state.users.map((data, idx) => {
+                      if(data.key === this.state.uid) return false;
 
-              <button type="button" style={{ position: 'absolute', top: '50%', right: '10%' }} onClick={() => this.auth('google')}>Google Auth { this.state.isAuthenticated ? 'true' : 'false' }</button>
+                      return (
+                        <div className={ `user-card ${data.online ? data.state ? 'is-active' : 'is-inactive' : 'user-card is-offline'}`} key={ idx }>
+                          <div className="profile-pic-area">
+                            <img className="profile-pic" src={ data.picture } alt="" />
+                          </div>
+                          <div className="profile-info-area">
+                            <strong>
+                              { data.name }
+                            </strong>
+                            <br />
+                            { data.online ? 'online' : 'offline' } - { data.state ? 'active' : 'inactive' }
+                            <br />
+                            {
+                              data.pomo && data.pomo[this.state.weekOfYear] && 
+                              data.pomo[this.state.weekOfYear]
+                              ? data.pomo[this.state.weekOfYear] + ' pomos this week'
+                              : 'no pomos this week'
+                            }
+                          </div>
+                        </div>
+                      )
+                    })
+                  }
+                </div>
+              }
+              <div className="main">
 
               <div className="container display timer">
                   <span className="time">{this.format(this.state.time)}</span>
@@ -324,6 +455,12 @@ class Pomodoro extends React.Component {
                   <div className="container">
 
                   <div className="controlsCheck">
+
+                      {
+                        this.state.isAuthenticated
+                        ? this.state.name && <div className="welcome-msg"><div id="customBtn" className="customGPlusSignIn" onClick={() => this.auth('google')}><span className="icon"></span><span className="buttonText">SIGN OUT</span></div></div>
+                        : <div className="welcome-msg"><div id="customBtn" className="customGPlusSignIn" onClick={() => this.auth('google')}><span className="icon"></span><span className="buttonText">SIGN IN / SIGN UP</span></div></div>
+                      }
 
                       <span className="check">
                       <input 
