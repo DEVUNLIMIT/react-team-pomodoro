@@ -59,6 +59,7 @@ body {
   position: fixed;
   top: 20px;
   left: 20px;
+  z-index: 10;
   border-radius: 4px;
   animation: slide-up 0.8s ease;
 
@@ -86,6 +87,18 @@ body {
 
     &.is-own {
       background-color: #fff;
+    }
+
+    &.is-active {
+      // background: #f25839;
+    }
+
+    &.is-inactive {
+      // background-color: #a5f239;
+    }
+
+    &.is-offline {
+      // background-color: #fff;
     }
 
     &::after {

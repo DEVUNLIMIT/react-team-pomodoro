@@ -45,7 +45,7 @@ class Pomodoro extends React.Component {
       this.elapseTime = this.elapseTime.bind(this);
 
       window.addEventListener('beforeunload', (e) => {
-        if(this.state.isAuthenticated && this.state.uid) {
+        if(this.state.isAuthenticated) {
           base.update(`users/${this.state.uid}`, {
             data: {
               online: false,
@@ -83,13 +83,7 @@ class Pomodoro extends React.Component {
     }
 
     componentDidMount() {
-      if(this.state.isAuthenticated) {
-        base.syncState('users', {
-          context: this,
-          state: 'users',
-          asArray: true
-        });
-      }
+      if(this.state.isAuthenticated) this.setSyncUsers();
 
       // Pomodoro
       this.setDefaultTime();
@@ -108,8 +102,13 @@ class Pomodoro extends React.Component {
         firebase.auth().signOut();
         this.setAuthenticate(false);
       } else {
+        let provider = new firebase.auth.GoogleAuthProvider();
+        provider.setCustomParameters({
+          hd: 'devunlimit.com',
+          login_hint: 'user@devunlimit.com'
+        });
         firebase.auth().languageCode = 'kr';
-        firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider())
+        firebase.auth().signInWithPopup(provider)
         .then(result => {
           let user = result.user;
           this.setAuthenticate(true);
@@ -158,11 +157,20 @@ class Pomodoro extends React.Component {
       });
       
       this.setAuthenticate(true);
+      this.setSyncUsers();
     }
 
     setAuthenticate(bool) {
       this.setState({ isAuthenticated: bool });
       localStorage.setItem('isAuthenticated', bool);
+    }
+
+    setSyncUsers() {
+      base.syncState('users', {
+        context: this,
+        state: 'users',
+        asArray: true
+      });
     }
 
     donePomo() {
@@ -233,6 +241,7 @@ class Pomodoro extends React.Component {
   
     play() {
       if (true === this.state.play) return;
+      if (this.state.play === false && this.state.time === 0) return;
   
       this.restartInterval();
       
@@ -387,7 +396,7 @@ class Pomodoro extends React.Component {
                         { this.state.name }
                       </strong>
                       <br />
-                      online - { this.state.playTime === 1500 && this.state.play ? 'active' : 'inactive' }
+                      online - { this.state.timeType === 1500 && this.state.play ? 'active' : 'inactive' }
                       <br />
                       {
                         this.state.pomo[this.state.weekOfYear]
