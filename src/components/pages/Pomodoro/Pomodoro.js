@@ -3,6 +3,7 @@ import React from 'react';
 
 import Mousetrap from 'mousetrap';
 import { Helmet } from 'react-helmet';
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 
 import moment from 'moment';
 
@@ -36,9 +37,13 @@ class Pomodoro extends React.Component {
         time: 0,
         play: false,
         timeType: 0,
-        title: ''
+        title: '',
+
+        // To-do
+        todoList: []
     };
 
+    this.todoOnDragEnd = this.todoOnDragEnd.bind(this);
     // Bind early, avoid function creation on render loop
     this.setTimeForCode = this.setTime.bind(this, 1500);
     this.setTimeForSocial = this.setTime.bind(this, 300);
@@ -78,6 +83,11 @@ class Pomodoro extends React.Component {
           context: this,
           state: 'pomo',
           asArray: false
+        });
+        base.syncState(`/users/${user.uid}/activeTodo`, {
+          context: this,
+          state: 'todoList',
+          asArray: true
         });
 
         // Send call status
@@ -123,7 +133,7 @@ class Pomodoro extends React.Component {
                       if(err) console.error(err);
                     });
                     
-                    return new Notification(`incoming call from ${callData.callerName}`, {
+                    return new Notification(`incoming call from ${ callData.callerName }`, {
                       icon: "img/coffee.png",
                       lang: "ko",
                       body: callData.message
@@ -131,7 +141,7 @@ class Pomodoro extends React.Component {
                   });
                 } else {
                   data.map((callData, idx) => {
-                    base.remove(`calls/${callData.key}`, (err) => {
+                    base.remove(`calls/${ callData.key }`, (err) => {
                       if(err) console.error(err);
                     });
                     
@@ -264,16 +274,76 @@ class Pomodoro extends React.Component {
 
   callUser(calleeId) {
     if(this.state.calledUser.find((calleeIds) => { return calleeIds === calleeId }) !== calleeId) {
-      base.push(`/calls`, {
+      let message = window.prompt();
+      if(message) {
+        base.push(`/calls`, {
+          data: {
+            callerName: this.state.name,
+            caller: this.state.uid,
+            callee: calleeId,
+            message: message
+          }
+        });
+      } else {
+        return false
+      }
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  // To-do
+  todoOnDragEnd(result) {
+    // dropped outside the list
+    if (!result.destination) {
+      return;
+    }
+
+    const todoList = this.todoListReorder(
+      this.state.todoList,
+      result.source.index,
+      result.destination.index
+    );
+
+    this.setState({
+      todoList,
+    });
+  }
+
+  todoListReorder = (list, startIndex, endIndex) => {
+    const result = Array.from(list);
+    const [removed] = result.splice(startIndex, 1);
+    result.splice(endIndex, 0, removed);
+  
+    return result;
+  };
+
+  doneTodo(index) {
+    if(window.confirm('Are you sure you want to done?')) {
+      let todo = this.state.todoList[index];
+      let arr = [...this.state.todoList];
+      arr.splice(index, 1);
+      this.setState({ todoList: arr });
+
+      base.push(`/users/${ this.state.uid }/doneTodo`, {
         data: {
-          callerName: this.state.name,
-          caller: this.state.uid,
-          callee: calleeId,
-          message: '끝나면 연락해 줘'
+          title: todo.title,
+          createDate: todo.createDate,
+          doneDate: moment().unix()
         }
       });
-      
-      return true;
+
+    } else {
+      return false;
+    }
+  }
+
+  deleteTodo(index) {
+    if(window.confirm('Are you sure you want to delete?')) {
+      let arr = [...this.state.todoList];
+      arr.splice(index, 1);
+      this.setState({ todoList: arr });
     } else {
       return false;
     }
@@ -476,6 +546,8 @@ class Pomodoro extends React.Component {
   }
 
   render() {
+    // console.info(this.state);
+
     return (
         <div className="pomodoro">
           <Helmet>
@@ -485,58 +557,116 @@ class Pomodoro extends React.Component {
           ------------------------------- */}
           {
             this.state.isAuthenticated && this.state.users &&
-            <div className="dashboard">
-              <div className={ `user-card is-own ${this.state.play ? 'is-active' : 'is-inactive'}` }>
-                <div className="profile-pic-area">
-                  <img className="profile-pic" src={ this.state.picture } alt="" />
+            [
+              <div className="dashboard" key="dashboard">
+                <div className={ `user-card is-own ${this.state.play ? 'is-active' : 'is-inactive'}` }>
+                  <div className="profile-pic-area">
+                    <img className="profile-pic" src={ this.state.picture } alt="" />
+                  </div>
+                  <div className="profile-info-area">
+                    <strong>
+                      { this.state.name }
+                    </strong>
+                    <br />
+                    online - { this.state.timeType === 1500 && this.state.play ? 'active' : 'inactive' }
+                    <br />
+                    {
+                      this.state.pomo[this.state.weekOfYear]
+                      ? this.state.pomo[this.state.weekOfYear] + ' pomos this week'
+                      : 'no pomos this week'
+                    }
+                  </div>
                 </div>
-                <div className="profile-info-area">
-                  <strong>
-                    { this.state.name }
-                  </strong>
-                  <br />
-                  online - { this.state.timeType === 1500 && this.state.play ? 'active' : 'inactive' }
-                  <br />
-                  {
-                    this.state.pomo[this.state.weekOfYear]
-                    ? this.state.pomo[this.state.weekOfYear] + ' pomos this week'
-                    : 'no pomos this week'
-                  }
-                </div>
-              </div>
-              {
-                this.state.users.map((data, idx) => {
-                  if(data.key === this.state.uid) return false;
+                {
+                  this.state.users.map((data, idx) => {
+                    if(data.key === this.state.uid) return false;
 
-                  return (
-                    <div
-                      className={ `user-card ${data.online ? data.state ? 'is-active' : 'is-inactive' : 'user-card is-offline'}`}
-                      key={ idx }
-                      data-uid={ data.key }
-                      onClick={ this.callUser.bind(this, data.key) }
-                    >
-                      <div className="profile-pic-area">
-                        <img className="profile-pic" src={ data.picture } alt="" />
+                    return (
+                      <div
+                        className={ `user-card ${ data.online ? data.state ? 'is-active' : 'is-inactive' : 'user-card is-offline' }` }
+                        key={ idx }
+                        data-uid={ data.key }
+                      >
+                        <div className="profile-pic-area">
+                          <img className="profile-pic" src={ data.picture } alt="" />
+                        </div>
+                        <div className="profile-info-area">
+                          <strong>
+                            { data.name }
+                          </strong>
+                          <div>
+                            { data.online ? 'online' : 'offline' } - { data.state ? 'active' : 'inactive' }
+                          </div>
+                          {
+                            data.pomo && data.pomo[this.state.weekOfYear] && 
+                            data.pomo[this.state.weekOfYear]
+                            ? <div>{ data.pomo[this.state.weekOfYear] } pomos this week</div>
+                            : <div>no pomos this week</div>
+                          }
+                          {
+                            data.activeTodo
+                            ? <div>current task: { data.activeTodo[0].title }</div>
+                            : <span>no current task</span>
+                          }
+                          {
+                            data.online && <button className="profile-call-btn" onClick={ this.callUser.bind(this, data.key) }>Call</button>
+                          }
+                        </div>
                       </div>
-                      <div className="profile-info-area">
-                        <strong>
-                          { data.name }
-                        </strong>
-                        <br />
-                        { data.online ? 'online' : 'offline' } - { data.state ? 'active' : 'inactive' }
-                        <br />
+                    )
+                  })
+                }
+              </div>,
+              <div className="todo" key="todo">
+                <h3 className="todo-title">
+                  To-do
+                </h3>
+                <DragDropContext onDragEnd={ this.todoOnDragEnd } key="todo2">
+                  <Droppable droppableId="droppable">
+                    {(provided, snapshot) => (
+                      <div
+                        ref={ provided.innerRef }
+                        className="todo-list"
+                      >
                         {
-                          data.pomo && data.pomo[this.state.weekOfYear] && 
-                          data.pomo[this.state.weekOfYear]
-                          ? data.pomo[this.state.weekOfYear] + ' pomos this week'
-                          : 'no pomos this week'
+                          this.state.todoList.map((item, index) => (
+                            <Draggable key={ index } draggableId={ index } index={ index }>
+                              {(provided, snapshot) => (
+                                <div
+                                  ref={ provided.innerRef }
+                                  { ...provided.draggableProps }
+                                  className="todo-item"
+                                >
+                                  { item.title }
+                                  <div className="todo-btn-area">
+                                    <button className="todo-btn todo-btn-done" onClick={ this.doneTodo.bind(this, index) }>[V]</button>
+                                    <button className="todo-btn todo-btn-close" onClick={ this.deleteTodo.bind(this, index) }>[X]</button>
+                                  </div>
+                                  <div className="todo-btn todo-btn-grippy" { ...provided.dragHandleProps }>::</div>
+                                </div>
+                              )}
+                            </Draggable>
+                          ))
                         }
+                        { provided.placeholder }
                       </div>
-                    </div>
-                  )
-                })
-              }
-            </div>
+                    )}
+                  </Droppable>
+                </DragDropContext>
+                {
+                  this.state.todoList.length < 5 &&
+                  <div
+                    className="todo-btn-new"
+                    onClick={(e) => {
+                      let title = window.prompt();
+                      title ? this.setState({ todoList: [...this.state.todoList, { title: title, createDate: moment().unix() }] }) : e.preventDefault();
+                    }}
+                  >
+                    + New
+                  </div>
+                }
+              </div>
+            ]
           }
           <div className="main">
 

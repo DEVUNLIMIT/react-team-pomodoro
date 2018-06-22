@@ -64,6 +64,7 @@ body {
   animation: slide-up 0.8s ease;
 
   .user-card {
+    position: relative;
     padding: 10px 20px;
     border-top: 1px solid #eee;
     background-color: #fff;
@@ -106,6 +107,7 @@ body {
       clear: both;
       content: '';
     }
+
     .profile-pic-area {
       float: left;
       position: relative;
@@ -124,11 +126,13 @@ body {
         content: "";
       }
     }
+
     .profile-pic {
       width: 80px;
       height: 80px;
       border-radius: 40px;
     }
+
     .profile-info-area {
       float: left;
       padding: 10px 0;
@@ -136,6 +140,113 @@ body {
       strong {
         font-size: 1.1em;
       }
+    }
+
+    .profile-call-btn {
+      position: absolute;
+      top: 69px;
+      left: 56px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #fff;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+  }
+}
+
+.todo {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 10;
+  min-width: 200px;
+  max-width: 300px;
+  padding-bottom: 10px;
+  border-radius: 4px;
+  background-color: #fff;
+  animation: slide-up 0.8s ease;
+
+  .todo-title {
+    margin: 0;
+    padding: 14px 20px 4px;
+    border-bottom: 1px solid #eee;
+  }
+
+  .todo-list {
+    margin: 16px 0 0;
+    padding: 0;
+    // counter-reset: num;
+  }
+
+  .todo-item {
+    display: block;
+    position: relative;
+    padding: 3px 60px 3px 20px;
+
+    &:hover,
+    &:hover .todo-btn {
+      background-color: #f9f9f9;
+    }
+    &:hover .todo-btn-grippy {
+      display: block;
+      cursor: move;
+    }
+
+    // &::before {
+    //   display: inline-block;
+    //   margin: 3px 6px 3px 0;
+    //   padding: 1px 4px;
+    //   border: 1px solid #bbb;
+    //   font-size: 0.85em;
+    //   color: #777;
+    //   counter-increment: num;
+    //   content: counter(num)
+    // }
+  }
+
+  .todo-btn-area {
+    position: absolute;
+    top: 50%;
+    right: 20px;
+    margin-top: -12px;
+  }
+
+  .todo-btn {
+    margin: 0;
+    padding: 0;
+    color: #999;
+    border: 0;
+    appearance: none;
+    -webkit-appearance: none;
+
+    &:focus {
+      outline: 0;
+    }
+
+    &:hover {
+      color: #333;
+    }
+  }
+
+  .todo-btn-grippy {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 5px;
+    margin-top: -9px;
+  }
+
+  .todo-btn-new {
+    margin: 10px 18px 8px;
+    padding: 5px 0;
+    border: 1px solid #b0cfff;
+    font-size: 0.85em;
+    text-align: center;
+    cursor: pointer;
+    
+    &:hover {
+      border: 1px solid #69a5ff;
     }
   }
 }
