@@ -272,6 +272,27 @@ class Pomodoro extends React.Component {
     });
   }
 
+  viewTasks(Id) {
+    if(this.state.viewTaskData && this.state.viewTaskData.uid !== Id) {
+      base.fetch(`users/${Id}/doneTodo`, {
+        context: this,
+        asArray: true,
+        then(data) {
+          data.length
+          ? this.setState({
+            viewTaskData: {
+              uid: Id,
+              data: data
+            }
+          })
+          : alert('no data')
+        }
+      });
+    } else {
+      this.setState({ viewTaskData: {} });
+    }
+  }
+
   callUser(calleeId) {
     if(this.state.calledUser.find((calleeIds) => { return calleeIds === calleeId }) !== calleeId) {
       let message = window.prompt();
@@ -546,7 +567,7 @@ class Pomodoro extends React.Component {
   }
 
   render() {
-    // console.info(this.state);
+    console.info(this.state.viewTaskData);
 
     return (
         <div className="pomodoro">
@@ -574,6 +595,21 @@ class Pomodoro extends React.Component {
                       this.state.pomo[this.state.weekOfYear]
                       ? this.state.pomo[this.state.weekOfYear] + ' pomos this week'
                       : 'no pomos this week'
+                    }
+                    <button className="profile-tasks-btn" onClick={ this.viewTasks.bind(this, this.state.uid) }>view all tasks</button>
+                    {
+                      this.state.viewTaskData && this.state.viewTaskData.uid === this.state.uid &&
+                      this.state.viewTaskData.data.map((data, idx) => {
+                        return (
+                          <div style={{ backgroundColor: "#eee", margin: "4px 0", borderRadius: "4px" }}>
+                            <strong>{ data.title }</strong>
+                            <br />
+                            create: { moment.unix(Number(data.createDate)).format("YYYY-MM-DD HH:mm:ss") }
+                            <br />
+                            done: { moment.unix(Number(data.doneDate)).format("YYYY-MM-DD HH:mm:ss") }
+                          </div>
+                        )
+                      })
                     }
                   </div>
                 </div>
@@ -607,6 +643,21 @@ class Pomodoro extends React.Component {
                             data.activeTodo
                             ? <div>current task: { data.activeTodo[0].title }</div>
                             : <span>no current task</span>
+                          }
+                          <button className="profile-tasks-btn" onClick={ this.viewTasks.bind(this, data.key) }>view all tasks</button>
+                          {
+                            this.state.viewTaskData && this.state.viewTaskData.uid === data.key &&
+                            this.state.viewTaskData.data.map((data, idx) => {
+                              return (
+                                <div style={{ backgroundColor: "#eee", margin: "4px 0", borderRadius: "4px" }}>
+                                  <strong>{ data.title }</strong>
+                                  <br />
+                                  create: { moment.unix(Number(data.createDate)).format("YYYY-MM-DD HH:mm:ss") }
+                                  <br />
+                                  done: { moment.unix(Number(data.doneDate)).format("YYYY-MM-DD HH:mm:ss") }
+                                </div>
+                              )
+                            })
                           }
                           {
                             data.online && <button className="profile-call-btn" onClick={ this.callUser.bind(this, data.key) }>Call</button>
