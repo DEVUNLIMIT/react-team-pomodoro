@@ -10,7 +10,9 @@ import moment from 'moment';
 import './Pomodoro.scss';
 
 import firebaseConf from './firebase.conf';
-import * as firebase from 'firebase';
+import firebase from 'firebase/app';
+import 'firebase/database';
+import 'firebase/auth';
 
 import Rebase from 're-base';
 
@@ -191,8 +193,10 @@ class Pomodoro extends React.Component {
         this.setAuthenticate(true);
 
         if(result.additionalUserInfo.isNewUser) {
+          console.info('is new user');
           this.addNewUser(user);
         } else {
+          console.info('is not new user');
           base.update(`users/${user.uid}`, {
             data: {
               online: true,
@@ -567,8 +571,6 @@ class Pomodoro extends React.Component {
   }
 
   render() {
-    console.info(this.state.viewTaskData);
-
     return (
         <div className="pomodoro">
           <Helmet>
