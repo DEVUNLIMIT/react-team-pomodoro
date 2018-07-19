@@ -4,6 +4,10 @@ import React from 'react';
 import Mousetrap from 'mousetrap';
 import { Helmet } from 'react-helmet';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faSquare } from '@fortawesome/free-regular-svg-icons';
+import { faTrashAlt } from '@fortawesome/free-solid-svg-icons';
+
 
 import moment from 'moment';
 
@@ -203,6 +207,7 @@ class Pomodoro extends React.Component {
               state: false
             }
           });
+          this.setSyncUsers();
         }
 
         this.setState({
@@ -571,6 +576,8 @@ class Pomodoro extends React.Component {
   }
 
   render() {
+    console.info(this.state.users);
+
     return (
         <div className="pomodoro">
           <Helmet>
@@ -674,7 +681,7 @@ class Pomodoro extends React.Component {
                 <h3 className="todo-title">
                   To-do
                 </h3>
-                <DragDropContext onDragEnd={ this.todoOnDragEnd } key="todo2">
+                <DragDropContext onDragEnd={ this.todoOnDragEnd } key="todoDnd">
                   <Droppable droppableId="droppable">
                     {(provided, snapshot) => (
                       <div
@@ -690,10 +697,28 @@ class Pomodoro extends React.Component {
                                   { ...provided.draggableProps }
                                   className="todo-item"
                                 >
-                                  { item.title }
-                                  <div className="todo-btn-area">
-                                    <button className="todo-btn todo-btn-done" onClick={ this.doneTodo.bind(this, index) }>[V]</button>
-                                    <button className="todo-btn todo-btn-close" onClick={ this.deleteTodo.bind(this, index) }>[X]</button>
+                                  <div className="inner">
+                                    { item.title }
+                                    <div className="todo-btn-done">
+                                      <FontAwesomeIcon
+                                        icon={faSquare}
+                                        onClick={
+                                          this.doneTodo.bind(this, index)
+                                        }
+                                      />
+                                    </div>
+                                    <div className="todo-btn-delete">
+                                      <FontAwesomeIcon
+                                        icon={ faTrashAlt }
+                                        onClick={
+                                          this.deleteTodo.bind(this, index)
+                                        }
+                                      />
+                                    </div>
+                                    {/* <div className="todo-btn-area">
+                                      <button className="todo-btn todo-btn-done" onClick={ this.doneTodo.bind(this, index) }>[V]</button>
+                                      <button className="todo-btn todo-btn-close" onClick={ this.deleteTodo.bind(this, index) }>[X]</button>
+                                    </div> */}
                                   </div>
                                   <div className="todo-btn todo-btn-grippy" { ...provided.dragHandleProps }>::</div>
                                 </div>
@@ -715,7 +740,7 @@ class Pomodoro extends React.Component {
                       title ? this.setState({ todoList: [...this.state.todoList, { title: title, createDate: moment().unix() }] }) : e.preventDefault();
                     }}
                   >
-                    + New
+                    New
                   </div>
                 }
               </div>
@@ -786,7 +811,7 @@ class Pomodoro extends React.Component {
                   </label>
                   </span>
 
-                  <span className="check">
+                  {/* <span className="check">
                   <input 
                       type="checkbox" 
                       ref="vibrate" 
@@ -798,7 +823,7 @@ class Pomodoro extends React.Component {
                     <span className="checkIcon" />
                     Vibration
                   </label>
-                  </span>
+                  </span> */}
 
               </div> {/* controlsCheck */}
 
