@@ -5,8 +5,8 @@ import Mousetrap from 'mousetrap';
 import { Helmet } from 'react-helmet';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSquare } from '@fortawesome/free-regular-svg-icons';
-import { faTrashAlt } from '@fortawesome/free-solid-svg-icons';
+import { faSquare, faCheckSquare } from '@fortawesome/free-regular-svg-icons';
+import { faTrashAlt, faPlus } from '@fortawesome/free-solid-svg-icons';
 
 
 import moment from 'moment';
@@ -46,7 +46,8 @@ class Pomodoro extends React.Component {
         title: '',
 
         // To-do
-        todoList: []
+        todoList: [],
+        doneTodoList: [],
     };
 
     this.todoOnDragEnd = this.todoOnDragEnd.bind(this);
@@ -90,10 +91,19 @@ class Pomodoro extends React.Component {
           state: 'pomo',
           asArray: false
         });
-        base.syncState(`/users/${user.uid}/activeTodo`, {
+        base.fetch(`/users/${user.uid}/activeTodo`, {
           context: this,
-          state: 'todoList',
-          asArray: true
+          asArray: true,
+          then(data) {
+            this.setState({ todoList: data });
+          }
+        });
+        base.fetch(`/users/${user.uid}/doneTodo`, {
+          context: this,
+          asArray: true,
+          then(data) {
+            this.setState({ doneTodoList: data });
+          }
         });
 
         // Send call status
@@ -350,30 +360,38 @@ class Pomodoro extends React.Component {
   };
 
   doneTodo(index) {
-    if(window.confirm('Are you sure you want to done?')) {
-      let todo = this.state.todoList[index];
-      let arr = [...this.state.todoList];
-      arr.splice(index, 1);
-      this.setState({ todoList: arr });
+    let arr = [...this.state.todoList];
+    let todo = this.state.todoList[index];
+    todo.doneDate = moment().unix();
+    arr.splice(index, 1);
+    this.setState({ todoList: arr });
 
-      base.push(`/users/${ this.state.uid }/doneTodo`, {
-        data: {
-          title: todo.title,
-          createDate: todo.createDate,
-          doneDate: moment().unix()
-        }
-      });
+    this.setState((prevState) => { return { doneTodoList: [todo, ...prevState.doneTodoList] } });
 
-    } else {
-      return false;
-    }
+    // base.push(`/users/${ this.state.uid }/doneTodo`, {
+    //   data: {
+    //     title: todo.title,
+    //     createDate: todo.createDate,
+    //     doneDate: moment().unix()
+    //   }
+    // });
   }
 
-  deleteTodo(index) {
+  resetTodo(index) {
+    let arr = [...this.state.doneTodoList];
+    let todo = this.state.doneTodoList[index];
+    delete todo['doneDate'];
+    arr.splice(index, 1);
+    this.setState({ doneTodoList: arr });
+
+    this.setState((prevState) => { return { todoList: [todo, ...prevState.todoList] } });
+  }
+
+  deleteTodo(index, state) {
     if(window.confirm('Are you sure you want to delete?')) {
-      let arr = [...this.state.todoList];
+      let arr = [...this.state[state]];
       arr.splice(index, 1);
-      this.setState({ todoList: arr });
+      this.setState({ [state]: arr });
     } else {
       return false;
     }
@@ -576,7 +594,7 @@ class Pomodoro extends React.Component {
   }
 
   render() {
-    console.info(this.state.users);
+    console.info(this.state);
 
     return (
         <div className="pomodoro">
@@ -680,6 +698,18 @@ class Pomodoro extends React.Component {
               <div className="todo" key="todo">
                 <h3 className="todo-title">
                   To-do
+                  {
+                    this.state.todoList.length < 5 &&
+                    <div
+                      className="todo-btn-new"
+                      onClick={(e) => {
+                        let title = window.prompt();
+                        title ? this.setState({ todoList: [...this.state.todoList, { title: title, createDate: moment().unix() }] }) : e.preventDefault();
+                      }}
+                    >
+                      <FontAwesomeIcon icon={ faPlus } />
+                    </div>
+                  }
                 </h3>
                 <DragDropContext onDragEnd={ this.todoOnDragEnd } key="todoDnd">
                   <Droppable droppableId="droppable">
@@ -698,7 +728,8 @@ class Pomodoro extends React.Component {
                                   className="todo-item"
                                 >
                                   <div className="inner">
-                                    { item.title }
+                                    <strong>{ item.title }</strong>
+                                    { moment.unix(item.createDate).format('YYYY-MM-DD HH:MM') }
                                     <div className="todo-btn-done">
                                       <FontAwesomeIcon
                                         icon={faSquare}
@@ -711,7 +742,7 @@ class Pomodoro extends React.Component {
                                       <FontAwesomeIcon
                                         icon={ faTrashAlt }
                                         onClick={
-                                          this.deleteTodo.bind(this, index)
+                                          this.deleteTodo.bind(this, index, 'todoList')
                                         }
                                       />
                                     </div>
@@ -732,15 +763,46 @@ class Pomodoro extends React.Component {
                   </Droppable>
                 </DragDropContext>
                 {
-                  this.state.todoList.length < 5 &&
+                  this.state.doneTodoList.length &&
                   <div
-                    className="todo-btn-new"
-                    onClick={(e) => {
-                      let title = window.prompt();
-                      title ? this.setState({ todoList: [...this.state.todoList, { title: title, createDate: moment().unix() }] }) : e.preventDefault();
-                    }}
+                    className="todo-list-completed"
                   >
-                    New
+                    <div
+                      className="todo-btn-view-compl"
+                      onClick={(e) => {
+                        
+                      }}
+                    >
+                      { this.state.doneTodoList.length } completed items
+                    </div>
+                    <div className="todo-list">
+                      {
+                        this.state.doneTodoList.map((item, index) => (
+                          <div className="todo-item" key={ index }>
+                            <div className="inner">
+                              <strong>{ item.title }</strong>
+                              { moment.unix(item.createDate).format('YYYY-MM-DD HH:MM') }
+                              <div className="todo-btn-done">
+                                <FontAwesomeIcon
+                                  icon={ faCheckSquare }
+                                  onClick={
+                                    this.resetTodo.bind(this, index)
+                                  }
+                                />
+                              </div>
+                              <div className="todo-btn-delete">
+                                <FontAwesomeIcon
+                                  icon={ faTrashAlt }
+                                  onClick={
+                                    this.deleteTodo.bind(this, index, 'doneTodoList')
+                                  }
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      }
+                    </div>
                   </div>
                 }
               </div>
@@ -749,21 +811,21 @@ class Pomodoro extends React.Component {
           <div className="main">
 
           <div className="container display timer">
-              <span className="time">{this.format(this.state.time)}</span>
-              <span className="timeType">The {this.formatType(this.state.timeType)} time!</span>
+            <span className="time">{this.format(this.state.time)}</span>
+            <span className="timeType">The {this.formatType(this.state.timeType)} time!</span>
           </div>
 
           <div className="container display types">
-              <button className="btn code" onClick={this.setTimeForCode}>Code</button>
-              <button className="btn social" onClick={this.setTimeForSocial}>Social</button>
-              <button className="btn coffee" onClick={this.setTimeForCoffee}>Coffee</button>
+            <button className="btn code" onClick={this.setTimeForCode}>Code</button>
+            <button className="btn social" onClick={this.setTimeForSocial}>Social</button>
+            <button className="btn coffee" onClick={this.setTimeForCoffee}>Coffee</button>
           </div>
 
           <div className="container">
-              <div className="controlsPlay">
-              <button className="play btnIcon" onClick={this.play}></button>
-              <button className="stop btnIcon" onClick={this.reset}></button>
-              </div>
+            <div className="controlsPlay">
+            <button className="play btnIcon" onClick={this.play}></button>
+            <button className="stop btnIcon" onClick={this.reset}></button>
+            </div>
           </div>
 
           </div> {/* main */}
@@ -775,7 +837,7 @@ class Pomodoro extends React.Component {
           <div className="controls">
               <div className="container">
 
-              <div className="controlsCheck">
+                <div className="controlsCheck">
 
                   {
                     this.state.isAuthenticated
@@ -785,11 +847,11 @@ class Pomodoro extends React.Component {
 
                   <span className="check">
                   <input 
-                      type="checkbox" 
-                      ref="notification" 
-                      id="notification"
-                      defaultChecked={this._getLocalStorage('notification')}
-                      onChange={this._setLocalStorage.bind(this, 'notification')} 
+                    type="checkbox" 
+                    ref="notification" 
+                    id="notification"
+                    defaultChecked={this._getLocalStorage('notification')}
+                    onChange={this._setLocalStorage.bind(this, 'notification')} 
                   />
                   <label htmlFor="notification">
                     <span className="checkIcon" />
@@ -799,11 +861,11 @@ class Pomodoro extends React.Component {
 
                   <span className="check">
                   <input 
-                      type="checkbox" 
-                      ref="audio" 
-                      id="audio"
-                      defaultChecked={this._getLocalStorage('audio')}
-                      onChange={this._setLocalStorage.bind(this, 'audio')} 
+                    type="checkbox" 
+                    ref="audio" 
+                    id="audio"
+                    defaultChecked={this._getLocalStorage('audio')}
+                    onChange={this._setLocalStorage.bind(this, 'audio')} 
                   />
                   <label htmlFor="audio">
                     <span className="checkIcon" />
@@ -825,7 +887,7 @@ class Pomodoro extends React.Component {
                   </label>
                   </span> */}
 
-              </div> {/* controlsCheck */}
+                </div> {/* controlsCheck */}
 
               </div> {/* container */}
           </div> {/* controls */}
@@ -833,7 +895,6 @@ class Pomodoro extends React.Component {
           {/* <Footer /> */}
 
           </div> {/* bottomBar */}
-
       </div>
     )
   }
