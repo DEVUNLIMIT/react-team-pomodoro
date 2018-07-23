@@ -91,19 +91,15 @@ class Pomodoro extends React.Component {
           state: 'pomo',
           asArray: false
         });
-        base.fetch(`/users/${user.uid}/activeTodo`, {
+        base.syncState(`/users/${user.uid}/activeTodo`, {
           context: this,
-          asArray: true,
-          then(data) {
-            this.setState({ todoList: data });
-          }
+          state: 'todoList',
+          asArray: true
         });
-        base.fetch(`/users/${user.uid}/doneTodo`, {
+        base.syncState(`/users/${user.uid}/doneTodo`, {
           context: this,
-          asArray: true,
-          then(data) {
-            this.setState({ doneTodoList: data });
-          }
+          state: 'doneTodoList',
+          asArray: true
         });
 
         // Send call status
@@ -262,7 +258,7 @@ class Pomodoro extends React.Component {
   }
 
   setSyncUsers() {
-    base.syncState('users', {
+    base.bindToState('users', {
       context: this,
       state: 'users',
       asArray: true
@@ -381,6 +377,7 @@ class Pomodoro extends React.Component {
     let arr = [...this.state.doneTodoList];
     let todo = this.state.doneTodoList[index];
     delete todo['doneDate'];
+    delete todo['key'];
     arr.splice(index, 1);
     this.setState({ doneTodoList: arr });
 
@@ -566,9 +563,9 @@ class Pomodoro extends React.Component {
 
   alert() {
     // vibration
-    if(this.refs.vibrate.checked) {
-      window.navigator.vibrate(1000);
-    }
+    // if(this.refs.vibrate.checked) {
+    //   window.navigator.vibrate(1000);
+    // }
     // audio
     if(this.refs.audio.checked) {
       let audio = new Audio('songs/alarm.mp3');
@@ -763,7 +760,7 @@ class Pomodoro extends React.Component {
                   </Droppable>
                 </DragDropContext>
                 {
-                  this.state.doneTodoList.length &&
+                  !!this.state.doneTodoList.length &&
                   <div
                     className="todo-list-completed"
                   >
