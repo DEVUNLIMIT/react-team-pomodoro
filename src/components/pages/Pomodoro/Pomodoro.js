@@ -162,7 +162,6 @@ class Pomodoro extends React.Component {
                 }
               }
             }
-            // console.log('받은 호출', data);
           }
         });
       } else {
@@ -203,10 +202,8 @@ class Pomodoro extends React.Component {
         this.setAuthenticate(true);
 
         if(result.additionalUserInfo.isNewUser) {
-          console.info('is new user');
           this.addNewUser(user);
         } else {
-          console.info('is not new user');
           base.update(`users/${user.uid}`, {
             data: {
               online: true,
@@ -591,7 +588,7 @@ class Pomodoro extends React.Component {
   }
 
   render() {
-    console.info(this.state);
+    // console.info(this.state);
 
     return (
         <div className="pomodoro">
@@ -729,7 +726,7 @@ class Pomodoro extends React.Component {
                                     { moment.unix(item.createDate).format('YYYY-MM-DD HH:MM') }
                                     <div className="todo-btn-done">
                                       <FontAwesomeIcon
-                                        icon={faSquare}
+                                        icon={ faSquare }
                                         onClick={
                                           this.doneTodo.bind(this, index)
                                         }
