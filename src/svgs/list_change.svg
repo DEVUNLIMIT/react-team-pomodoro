@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="24px" height="24px" viewBox="0 0 24 24" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 51.1 (57501) - http://www.bohemiancoding.com/sketch -->
+    <title>Components/Atoms/Icons/List_Change</title>
+    <desc>Created with Sketch.</desc>
+    <defs></defs>
+    <g id="Components/Atoms/Icons/List_Change" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd" stroke-linecap="square" stroke-opacity="0.4">
+        <g id="List_Change" transform="translate(8.000000, 7.000000)" fill-rule="nonzero" stroke="#000000">
+            <polyline id="Down" transform="translate(4.000000, 8.500000) rotate(180.000000) translate(-4.000000, -8.500000) " points="0 10 4 7 8 10"></polyline>
+            <polyline id="Up" points="0 3 4 0 8 3"></polyline>
+        </g>
+    </g>
+</svg>

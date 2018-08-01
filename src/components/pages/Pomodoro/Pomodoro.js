@@ -4,12 +4,10 @@ import React from 'react';
 import Mousetrap from 'mousetrap';
 import { Helmet } from 'react-helmet';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSquare, faCheckSquare } from '@fortawesome/free-regular-svg-icons';
-import { faTrashAlt, faPlus } from '@fortawesome/free-solid-svg-icons';
-
+import SVGInline from 'react-svg-inline';
 
 import moment from 'moment';
+import 'moment/locale/ko';
 
 import './Pomodoro.scss';
 
@@ -23,6 +21,13 @@ import Rebase from 're-base';
 const app = firebase.initializeApp({ ...firebaseConf });
 const base = Rebase.createClass(app.database());
 
+const _SVGS = require.context('../../../svgs', true, /\.svg$/)
+const SVGS = _SVGS.keys().reduce((images, key) => {
+  let _key = key.split('./')[1].split('.svg')[0];
+  images[_key] = _SVGS(key);
+  return images;
+}, {})
+
 class Pomodoro extends React.Component {
   constructor() {
     super();
@@ -35,11 +40,12 @@ class Pomodoro extends React.Component {
         name: null,
         picture: null,
         pomo: 0,
+        status: false,
 
         // Call
         standbyCall: [],
         calledUser: [],
-        unreadCall: [],
+        // unreadCall: [],
         readCall: [],
         
         // UI
@@ -66,6 +72,8 @@ class Pomodoro extends React.Component {
     this.reset = this.reset.bind(this);
     this.play = this.play.bind(this);
     this.elapseTime = this.elapseTime.bind(this);
+
+    moment.locale('ko');
 
     window.addEventListener('beforeunload', (e) => {
       if(this.state.isAuthenticated) {
@@ -108,6 +116,14 @@ class Pomodoro extends React.Component {
           context: this,
           state: 'doneTodoList',
           asArray: true
+        });
+        base.fetch(`/users/${user.uid}/readCall`, {
+          context: this,
+          asArray: true,
+          queries: {
+            limitToLast: 10
+          },
+          then(data) { this.setState({ readCall: data.reverse() }) }
         });
 
         // Send call status
@@ -346,11 +362,14 @@ class Pomodoro extends React.Component {
           ...callData,
           readDate: moment().unix()
         },
-        then(error) {
+        catch(error) {
           console.error(error);
         }
       });
-      this.setState({ standbyCall: [] })
+      this.setState((prevState) => { return {
+        standbyCall: [],
+        readCall: [callData, ...prevState.readCall]
+      }});
     })
     .catch(error => {
       console.error(error);
@@ -503,19 +522,46 @@ class Pomodoro extends React.Component {
       play: true 
     });
 
-    if(this.state.isAuthenticated && this.state.timeType === 1500) {
-      base.update(`users/${this.state.uid}`, {
-        data: {
-          state: true
-        }
-      });
+    if(this.state.isAuthenticated) {
+      switch(this.state.timeType) {
+        case 1500:
+          this.setState({ status: 'working' });
+          base.update(`users/${this.state.uid}`, {
+            data: {
+              state: 'working'
+            }
+          });
+          break;
+        case 900:
+          this.setState({ status: 'conference' });
+          base.update(`users/${this.state.uid}`, {
+            data: {
+              state: 'conference'
+            }
+          });
+          break;
+        case 300:
+          this.setState({ status: 'false' });
+          base.update(`users/${this.state.uid}`, {
+            data: {
+              state: 'rest'
+            }
+          });
+          break;
+        default:
+          base.update(`users/${this.state.uid}`, {
+            data: {
+              state: false
+            }
+          });
+      }
     }
   }
 
   reset(resetFor = this.state.time) {
     clearInterval(this.interval);
     this.format(resetFor);
-    this.setState({ play: false });
+    this.setState({ play: false, status: false });
 
     if(this.state.standbyCall.length) {
       this.state.standbyCall.map((callData, idx) => {
@@ -647,8 +693,6 @@ class Pomodoro extends React.Component {
   }
 
   render() {
-    // console.info(this.state);
-
     const clockStrokes = [];
     for(let i = 1; i < 61; i++) {
       clockStrokes.push(<div className="stroke" style={{ "transform": `rotate(${ i * 6 }deg)` }} key={ i }></div>);
@@ -680,24 +724,36 @@ class Pomodoro extends React.Component {
               { this.format(this.state.time) }
             </strong>
             <div className="control-area">
-              <button className="btn-play" id="control-play" onClick={ this.play }>
-                <i className="sr-only">Start</i>
+              {
+                this.state.play
+                ? <button className="btn-stop" id="control-stop" onClick={ this.reset }>
+                  타이머 종료
+                </button>
+                : <button className="btn-play" id="control-play" onClick={ this.play }>
+                타이머 시작
               </button>
-              <button className="btn-stop" id="control-stop" onClick={ this.reset }>
-                <i className="sr-only">Pause</i>
-              </button>
+              }
             </div>
           </div>
         </div>
-        <div id="todo-now">
-          <strong className="text">
-            {
-              this.state.todoList.length > 0
-              ? `${this.state.todoList[0].title} 중`
-              : `현재 진행중인 Task 없음`
-            }
-          </strong>
-        </div>
+        {
+          this.state.isAuthenticated && this.state.uid &&
+          <div id="todo-now" className={`${ this.state.status ? 'is-' + this.state.status : 'is-inactive' }`}>
+            <div className="inner">
+              <div className="thumbnail">
+                <div className="status"></div>
+                <img className="picture" src={ this.state.picture } alt={`${this.state.name}의 프로필 사진`} />
+              </div>
+              <div className="info">
+                <strong className="name">{ this.state.name }</strong>
+                {
+                  this.state.todoList.length > 0 &&
+                  <span className="todo">{ this.state.todoList[0].title }</span>
+                }
+              </div>
+            </div>
+          </div>
+        }
         <div id="dashboard" className={ this.state.dashboard ? 'is-active' : 'is-inactive' } >
             <div
               className="header"
@@ -713,36 +769,101 @@ class Pomodoro extends React.Component {
                 <span className="label">타이머 종료까지</span>
                 <strong className="time">{ this.format(this.state.time) }</strong>
               </div>
-              <i className="header-icon"></i>
+              <SVGInline className="header-icon" svg={SVGS['arrow']} />
               <h2 className="header-title">
                 { this.state.dashboard ? '타이머로 돌아가기' : 'Dashboard' }
               </h2>
             </div>
             <div className="dashboard-tab" ref="dashboardTab">
-              <button className="tab-item is-active" onClick={ this.switchTab }>Message</button>
+              <button className="tab-item is-active" onClick={ this.switchTab }>Preset</button>
               <button className="tab-item" onClick={ this.switchTab }>To-do</button>
+              <button className={`tab-item ${this.state.standbyCall.length ? 'badge-on' : ''}`} onClick={ this.switchTab }>Call</button>
               <button className="tab-item" onClick={ this.switchTab }>Members</button>
-              <button className="tab-item" onClick={ this.switchTab }>Setting</button>
             </div>
             <div className="dashboard-container" ref="dashboardContainer">
-              <div className="dashboard-content" id="dashboard-message">
-                {
-                  this.state.users && !!this.state.standbyCall.length ?
-                  <ul>
-                    {
-                      this.state.standbyCall.map((item, index) => {
-                        return (
-                          <li key={ index }>
-                            callerName: { this.state.users[item.caller].name }
-                            message: { item.message }
-                            send: { item.sendDate }
-                          </li>
-                        );
-                      })
-                    }
+              <div className="dashboard-content" id="dashboard-setting">
+                <div className="setting-type">
+                  <h3 className="menu-title">뽀모도르 모드</h3>
+                  <div className="type-inner">
+                    <div
+                      className={`button-settype type-working ${this.state.timeType === 1500 ? 'is-selected' : ''}`}
+                      onClick={ this.setTimeForCode }
+                      role="button"
+                    >
+                      <div className="icon" />
+                      <strong className="name">업무중</strong>
+                    </div>
+                    <div
+                      className={`button-settype type-rest ${this.state.timeType === 300 ? 'is-selected' : ''}`}
+                      onClick={ this.setTimeForSocial }
+                      role="button"
+                    >
+                      <div className="icon" />
+                      <strong className="name">휴식중</strong>
+                    </div>
+                    <div
+                      className={`button-settype type-conference ${this.state.timeType === 900 ? 'is-selected' : ''}`}
+                      onClick={ this.setTimeForCoffee }
+                      role="button"
+                    >
+                      <div className="icon" />
+                      <strong className="name">회의시간</strong>
+                    </div>
+                  </div>
+                </div>
+                <div className="setting-options">
+                  <h3 className="menu-title">뽀모도르 옵션</h3>
+                  <ul className="option-list">
+                    <li className="option">
+                      <div className="label">
+                        <strong className="label-name">알림</strong>
+                        <span className="label-desc">시간 종료, 메세지 등을 확인할 수 있는 알림을 띄워줍니다.</span>
+                      </div>
+                      <div className="control">
+                        <input 
+                          type="checkbox"
+                          ref="notification"
+                          id="notification"
+                          defaultChecked={this._getLocalStorage('notification')}
+                          onChange={this._setLocalStorage.bind(this, 'notification')}
+                        />
+                        <label htmlFor="notification" className="toggle" />
+                      </div>
+                    </li>
+                    <li className="option">
+                      <div className="label">
+                        <strong className="label-name">소리</strong>
+                        <span className="label-desc">시간 종료, 메세지 알림시 사운드를 재생합니다.</span>
+                      </div>
+                      <div className="control">
+                        <input 
+                          type="checkbox" 
+                          ref="audio" 
+                          id="audio"
+                          defaultChecked={this._getLocalStorage('audio')}
+                          onChange={this._setLocalStorage.bind(this, 'audio')} 
+                        />
+                        <label htmlFor="audio" className="toggle" />
+                      </div>
+                    </li>
+                    <li className="option">
+                      <div className="label">
+                        <strong className="label-name">방해금지 모드</strong>
+                        <span className="label-desc">UI요소를 최대한 배제하여 업무와 뽀모도로 타이머에만 집중할 수 있게 합니다.</span>
+                      </div>
+                      <div className="control">
+                        <input 
+                          type="checkbox" 
+                          ref="dnd" 
+                          id="dnd"
+                          defaultChecked={this._getLocalStorage('dnd')}
+                          onChange={this._setLocalStorage.bind(this, 'dnd')} 
+                        />
+                        <label htmlFor="dnd" className="toggle" />
+                      </div>
+                    </li>
                   </ul>
-                  : 'no standby call'
-                }
+                </div>
               </div>
               <div className="dashboard-content" id="dashboard-todo">
                 <div className="active-todos">
@@ -769,27 +890,27 @@ class Pomodoro extends React.Component {
                                         <strong className="title">{ item.title }</strong>
                                         { moment.unix(item.createDate).format('YYYY-MM-DD HH:MM') }
                                         <div className="todo-btn todo-btn-done">
-                                          <FontAwesomeIcon
-                                            icon={ faSquare }
+                                          <div
+                                            className="checkbox-done"
+                                            role="checkbox"
+                                            aria-checked={ false }
                                             onClick={
                                               this.doneTodo.bind(this, index)
                                             }
                                           />
                                         </div>
                                         <div className="todo-btn todo-btn-delete">
-                                          <FontAwesomeIcon
-                                            icon={ faTrashAlt }
+                                          <SVGInline
+                                            svg={SVGS['trash']}
                                             onClick={
                                               this.deleteTodo.bind(this, index, 'todoList')
                                             }
                                           />
                                         </div>
-                                        {/* <div className="todo-btn-area">
-                                          <button className="todo-btn todo-btn-done" onClick={ this.doneTodo.bind(this, index) }>[V]</button>
-                                          <button className="todo-btn todo-btn-close" onClick={ this.deleteTodo.bind(this, index) }>[X]</button>
-                                        </div> */}
                                       </div>
-                                      <div className="todo-btn todo-btn-grippy" { ...provided.dragHandleProps }>::</div>
+                                      <div className="todo-btn todo-btn-grippy" { ...provided.dragHandleProps }>
+                                        <SVGInline svg={ SVGS['list_change'] } />
+                                      </div>
                                     </div>
                                   )}
                                 </Draggable>
@@ -811,7 +932,7 @@ class Pomodoro extends React.Component {
                         title ? this.setState({ todoList: [...this.state.todoList, { title: title, createDate: moment().unix() }] }) : e.preventDefault();
                       }}
                     >
-                      <FontAwesomeIcon icon={ faPlus } />
+                      +
                     </div>
                   }
                 </div>
@@ -827,16 +948,20 @@ class Pomodoro extends React.Component {
                               <strong className="title">{ item.title }</strong>
                               {/* { moment.unix(item.createDate).format('YYYY-MM-DD HH:MM') } */}
                               <div className="todo-btn todo-btn-done">
-                                <FontAwesomeIcon
-                                  icon={ faCheckSquare }
+                                <div
+                                  className="checkbox-done"
+                                  role="checkbox"
+                                  aria-checked={ true }
                                   onClick={
                                     this.resetTodo.bind(this, index)
                                   }
-                                />
+                                >
+                                  <SVGInline svg={SVGS['check']} />
+                                </div>
                               </div>
                               <div className="todo-btn todo-btn-delete">
-                                <FontAwesomeIcon
-                                  icon={ faTrashAlt }
+                                <SVGInline
+                                  svg={SVGS['trash']}
                                   onClick={
                                     this.deleteTodo.bind(this, index, 'doneTodoList')
                                   }
@@ -851,6 +976,62 @@ class Pomodoro extends React.Component {
                   }
                 </div>
               </div>
+              <div className="dashboard-content" id="dashboard-call">
+                {
+                  this.state.users && !!this.state.standbyCall.length &&
+                  <div className="calls-list type-unread">
+                    <strong className="list-title">읽지 않은 메세지</strong>
+                    {
+                      this.state.standbyCall.map((item, index) => {
+                        return (
+                          <div className={ `calls ${ this.state.users[item.caller].online ? this.state.users[item.caller].state ? 'is-' + this.state.users[item.caller].state : 'is-inactive' : 'is-offline' }` } key={ index }>
+                            <div className="thumbnail">
+                              <div className="status" />
+                              <img className="picture" src={ this.state.users[item.caller].picture } alt={`${this.state.users[item.caller].name}의 프로필 사진`} />
+                            </div>
+                            <div className="inner">
+                              <div className="info">
+                                <strong className="info-name">{ this.state.users[item.caller].name }</strong>
+                                <span className="info-date">{ moment.unix(item.sendDate).fromNow() }</span>
+                              </div>
+                              <div className="content">
+                                <p className="content-message">{ item.message }</p>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })
+                    }
+                  </div>
+                }
+                {
+                  this.state.users && !!this.state.readCall.length &&
+                  <div className="calls-list type-read">
+                    <strong className="list-title">읽은 메세지</strong>
+                    {
+                      this.state.readCall.map((item, index) => {
+                        return (
+                          <div className={ `calls ${ this.state.users[item.caller].online ? this.state.users[item.caller].state ? 'is-' + this.state.users[item.caller].state : 'is-inactive' : 'is-offline' }` } key={ index }>
+                            <div className="thumbnail">
+                              <div className="status" />
+                              <img className="picture" src={ this.state.users[item.caller].picture } alt={`${this.state.users[item.caller].name}의 프로필 사진`} />
+                            </div>
+                            <div className="inner">
+                              <div className="info">
+                                <strong className="info-name">{ this.state.users[item.caller].name }</strong>
+                                <span className="info-date">{ moment.unix(item.sendDate).fromNow() }</span>
+                              </div>
+                              <div className="content">
+                                <p className="content-message">{ item.message }</p>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })
+                    }
+                  </div>
+                }
+              </div>
               <div className="dashboard-content" id="dashboard-members">
                 <ul className="members-list">
                   {
@@ -861,12 +1042,13 @@ class Pomodoro extends React.Component {
 
                       return (
                         <li
-                          className={ `member ${ data.online ? data.state ? 'is-active' : 'is-inactive' : 'is-offline' }` }
+                          className={ `member ${ data.online ? data.state ? 'is-' + data.state : 'is-inactive' : 'is-offline' }` }
                           key={ idx }
                           data-uid={ key }
                         >
                           <div className="member-header">
                             <div className="thumbnail">
+                              <div className="status" />
                               <img className="picture" src={ data.picture } alt={`${data.name}의 프로필 사진`} />
                             </div>
                             <div className="profile-area">
@@ -919,42 +1101,6 @@ class Pomodoro extends React.Component {
                   }
                 </ul>
               </div>
-              <div className="dashboard-content" id="dashboard-setting">
-                <ul className="setting-options">
-                  <li className="option">
-                    <div className="label">
-                      <strong className="label-name">알림</strong>
-                      <span className="label-desc">시간 종료, 메세지 등을 확인할 수 있는 알림을 띄워줍니다.</span>
-                    </div>
-                    <div className="control">
-                      <input 
-                        type="checkbox"
-                        ref="notification"
-                        id="notification"
-                        defaultChecked={this._getLocalStorage('notification')}
-                        onChange={this._setLocalStorage.bind(this, 'notification')}
-                      />
-                      <label htmlFor="notification" className="toggle" />
-                    </div>
-                  </li>
-                  <li className="option">
-                    <div className="label">
-                      <strong className="label-name">소리</strong>
-                      <span className="label-desc">시간 종료, 메세지 알림시 사운드를 재생합니다.</span>
-                    </div>
-                    <div className="control">
-                      <input 
-                        type="checkbox" 
-                        ref="audio" 
-                        id="audio"
-                        defaultChecked={this._getLocalStorage('audio')}
-                        onChange={this._setLocalStorage.bind(this, 'audio')} 
-                      />
-                      <label htmlFor="notification" className="toggle" />
-                    </div>
-                  </li>
-                </ul>
-              </div>
             </div>
         </div>
         {
@@ -969,11 +1115,12 @@ class Pomodoro extends React.Component {
 
                     return (
                       <li
-                        className={ `member ${ data.online ? data.state ? 'is-active' : 'is-inactive' : 'is-offline' }` }
+                        className={ `member ${ data.online ? data.state ? 'is-' + data.state : 'is-inactive' : 'is-offline' }` }
                         key={ idx }
                         data-uid={ key }
                       >
                         <div className="thumbnail">
+                          <div className="status" />
                           <img className="picture" src={ data.picture } alt={`${data.name}의 프로필 사진`} />
                         </div>
                         <div className="name">{ data.name }</div>
@@ -1004,305 +1151,6 @@ class Pomodoro extends React.Component {
           )
         }
       </div>
-      //   <div className="pomodoro">
-      //     <Helmet>
-      //       <title>{this.state.title}</title>
-      //     </Helmet>
-      //     {/* Main section
-      //     ------------------------------- */}
-      //     {
-      //       this.state.isAuthenticated && this.state.users &&
-      //       [
-      //         <div className="dashboard" key="dashboard">
-      //           <div className={ `user-card is-own ${this.state.play ? 'is-active' : 'is-inactive'}` }>
-      //             <div className="profile-pic-area">
-      //               <img className="profile-pic" src={ this.state.picture } alt="" />
-      //             </div>
-      //             <div className="profile-info-area">
-      //               <strong>
-      //                 { this.state.name }
-      //               </strong>
-      //               <br />
-      //               online - { this.state.timeType === 1500 && this.state.play ? 'active' : 'inactive' }
-      //               <br />
-      //               {
-      //                 this.state.pomo[this.state.weekOfYear]
-      //                 ? this.state.pomo[this.state.weekOfYear] + ' pomos this week'
-      //                 : 'no pomos this week'
-      //               }
-      //               <button className="profile-tasks-btn" onClick={ this.viewTasks.bind(this, this.state.uid) }>view all tasks</button>
-      //               {
-      //                 this.state.viewTaskData && this.state.viewTaskData.uid === this.state.uid &&
-      //                 this.state.viewTaskData.data.map((data, idx) => {
-      //                   return (
-      //                     <div style={{ backgroundColor: "#eee", margin: "4px 0", borderRadius: "4px" }}>
-      //                       <strong>{ data.title }</strong>
-      //                       <br />
-      //                       create: { moment.unix(Number(data.createDate)).format("YYYY-MM-DD HH:mm:ss") }
-      //                       <br />
-      //                       done: { moment.unix(Number(data.doneDate)).format("YYYY-MM-DD HH:mm:ss") }
-      //                     </div>
-      //                   )
-      //                 })
-      //               }
-      //             </div>
-      //           </div>
-      //           {
-      //             this.state.users.map((data, idx) => {
-      //               if(data.key === this.state.uid) return false;
-
-      //               return (
-      //                 <div
-      //                   className={ `user-card ${ data.online ? data.state ? 'is-active' : 'is-inactive' : 'user-card is-offline' }` }
-      //                   key={ idx }
-      //                   data-uid={ data.key }
-      //                 >
-      //                   <div className="profile-pic-area">
-      //                     <img className="profile-pic" src={ data.picture } alt="" />
-      //                   </div>
-      //                   <div className="profile-info-area">
-      //                     <strong>
-      //                       { data.name }
-      //                     </strong>
-      //                     <div>
-      //                       { data.online ? 'online' : 'offline' } - { data.state ? 'active' : 'inactive' }
-      //                     </div>
-      //                     {
-      //                       data.pomo && data.pomo[this.state.weekOfYear] && 
-      //                       data.pomo[this.state.weekOfYear]
-      //                       ? <div>{ data.pomo[this.state.weekOfYear] } pomos this week</div>
-      //                       : <div>no pomos this week</div>
-      //                     }
-      //                     {
-      //                       data.activeTodo
-      //                       ? <div>current task: { data.activeTodo[0].title }</div>
-      //                       : <span>no current task</span>
-      //                     }
-      //                     <button className="profile-tasks-btn" onClick={ this.viewTasks.bind(this, data.key) }>view all tasks</button>
-      //                     {
-      //                       this.state.viewTaskData && this.state.viewTaskData.uid === data.key &&
-      //                       this.state.viewTaskData.data.map((data, idx) => {
-      //                         return (
-      //                           <div style={{ backgroundColor: "#eee", margin: "4px 0", borderRadius: "4px" }}>
-      //                             <strong>{ data.title }</strong>
-      //                             <br />
-      //                             create: { moment.unix(Number(data.createDate)).format("YYYY-MM-DD HH:mm:ss") }
-      //                             <br />
-      //                             done: { moment.unix(Number(data.doneDate)).format("YYYY-MM-DD HH:mm:ss") }
-      //                           </div>
-      //                         )
-      //                       })
-      //                     }
-      //                     {
-      //                       data.online && <button className="profile-call-btn" onClick={ this.callUser.bind(this, data.key) }>Call</button>
-      //                     }
-      //                   </div>
-      //                 </div>
-      //               )
-      //             })
-      //           }
-      //         </div>,
-      //         <div className="todo" key="todo">
-      //           <h3 className="todo-title">
-      //             To-do
-      //             {
-      //               this.state.todoList.length < 5 &&
-      //               <div
-      //                 className="todo-btn-new"
-      //                 onClick={(e) => {
-      //                   let title = window.prompt();
-      //                   title ? this.setState({ todoList: [...this.state.todoList, { title: title, createDate: moment().unix() }] }) : e.preventDefault();
-      //                 }}
-      //               >
-      //                 <FontAwesomeIcon icon={ faPlus } />
-      //               </div>
-      //             }
-      //           </h3>
-      //           <DragDropContext onDragEnd={ this.todoOnDragEnd } key="todoDnd">
-      //             <Droppable droppableId="droppable">
-      //               {(provided, snapshot) => (
-      //                 <div
-      //                   ref={ provided.innerRef }
-      //                   className="todo-list"
-      //                 >
-      //                   {
-      //                     this.state.todoList.map((item, index) => (
-      //                       <Draggable key={ index } draggableId={ index } index={ index }>
-      //                         {(provided, snapshot) => (
-      //                           <div
-      //                             ref={ provided.innerRef }
-      //                             { ...provided.draggableProps }
-      //                             className="todo-item"
-      //                           >
-      //                             <div className="inner">
-      //                               <strong>{ item.title }</strong>
-      //                               { moment.unix(item.createDate).format('YYYY-MM-DD HH:MM') }
-      //                               <div className="todo-btn-done">
-      //                                 <FontAwesomeIcon
-      //                                   icon={ faSquare }
-      //                                   onClick={
-      //                                     this.doneTodo.bind(this, index)
-      //                                   }
-      //                                 />
-      //                               </div>
-      //                               <div className="todo-btn-delete">
-      //                                 <FontAwesomeIcon
-      //                                   icon={ faTrashAlt }
-      //                                   onClick={
-      //                                     this.deleteTodo.bind(this, index, 'todoList')
-      //                                   }
-      //                                 />
-      //                               </div>
-      //                               {/* <div className="todo-btn-area">
-      //                                 <button className="todo-btn todo-btn-done" onClick={ this.doneTodo.bind(this, index) }>[V]</button>
-      //                                 <button className="todo-btn todo-btn-close" onClick={ this.deleteTodo.bind(this, index) }>[X]</button>
-      //                               </div> */}
-      //                             </div>
-      //                             <div className="todo-btn todo-btn-grippy" { ...provided.dragHandleProps }>::</div>
-      //                           </div>
-      //                         )}
-      //                       </Draggable>
-      //                     ))
-      //                   }
-      //                   { provided.placeholder }
-      //                 </div>
-      //               )}
-      //             </Droppable>
-      //           </DragDropContext>
-      //           {
-      //             !!this.state.doneTodoList.length &&
-      //             <div
-      //               className="todo-list-completed"
-      //             >
-      //               <div
-      //                 className="todo-btn-view-compl"
-      //                 onClick={(e) => {
-                        
-      //                 }}
-      //               >
-      //                 { this.state.doneTodoList.length } completed items
-      //               </div>
-      //               <div className="todo-list">
-      //                 {
-      //                   this.state.doneTodoList.map((item, index) => (
-      //                     <div className="todo-item" key={ index }>
-      //                       <div className="inner">
-      //                         <strong>{ item.title }</strong>
-      //                         { moment.unix(item.createDate).format('YYYY-MM-DD HH:MM') }
-      //                         <div className="todo-btn-done">
-      //                           <FontAwesomeIcon
-      //                             icon={ faCheckSquare }
-      //                             onClick={
-      //                               this.resetTodo.bind(this, index)
-      //                             }
-      //                           />
-      //                         </div>
-      //                         <div className="todo-btn-delete">
-      //                           <FontAwesomeIcon
-      //                             icon={ faTrashAlt }
-      //                             onClick={
-      //                               this.deleteTodo.bind(this, index, 'doneTodoList')
-      //                             }
-      //                           />
-      //                         </div>
-      //                       </div>
-      //                     </div>
-      //                   ))
-      //                 }
-      //               </div>
-      //             </div>
-      //           }
-      //         </div>
-      //       ]
-      //     }
-      //     <div className="main">
-
-      //     <div className="container display timer">
-      //       <span className="time">{this.format(this.state.time)}</span>
-      //       <span className="timeType">The {this.formatType(this.state.timeType)} time!</span>
-      //     </div>
-
-      //     <div className="container display types">
-      //       <button className="btn code" onClick={this.setTimeForCode}>Code</button>
-      //       <button className="btn social" onClick={this.setTimeForSocial}>Social</button>
-      //       <button className="btn coffee" onClick={this.setTimeForCoffee}>Coffee</button>
-      //     </div>
-
-      //     <div className="container">
-      //       <div className="controlsPlay">
-      //       <button className="play btnIcon" onClick={this.play}></button>
-      //       <button className="stop btnIcon" onClick={this.reset}></button>
-      //       </div>
-      //     </div>
-
-      //     </div> {/* main */}
-
-      //     {/* Bottom section
-      //     ------------------------------- */}
-      //     <div className="bottomBar">
-
-      //     <div className="controls">
-      //         <div className="container">
-
-      //           <div className="controlsCheck">
-
-      //             {
-      //               this.state.isAuthenticated
-      //               ? this.state.name && <div className="welcome-msg"><div id="customBtn" className="customGPlusSignIn" onClick={() => this.auth('google')}><span className="icon"></span><span className="buttonText">SIGN OUT</span></div></div>
-      //               : <div className="welcome-msg"><div id="customBtn" className="customGPlusSignIn" onClick={() => this.auth('google')}><span className="icon"></span><span className="buttonText">SIGN IN / SIGN UP</span></div></div>
-      //             }
-
-      //             <span className="check">
-      //             <input 
-      //               type="checkbox" 
-      //               ref="notification" 
-      //               id="notification"
-      //               defaultChecked={this._getLocalStorage('notification')}
-      //               onChange={this._setLocalStorage.bind(this, 'notification')} 
-      //             />
-      //             <label htmlFor="notification">
-      //               <span className="checkIcon" />
-      //               Notification
-      //             </label>
-      //             </span>
-
-      //             <span className="check">
-      //             <input 
-      //               type="checkbox" 
-      //               ref="audio" 
-      //               id="audio"
-      //               defaultChecked={this._getLocalStorage('audio')}
-      //               onChange={this._setLocalStorage.bind(this, 'audio')} 
-      //             />
-      //             <label htmlFor="audio">
-      //               <span className="checkIcon" />
-      //               Sound
-      //             </label>
-      //             </span>
-
-      //             {/* <span className="check">
-      //             <input 
-      //                 type="checkbox" 
-      //                 ref="vibrate" 
-      //                 id="vibrate"
-      //                 defaultChecked={this._getLocalStorage('vibrate')}
-      //                 onChange={this._setLocalStorage.bind(this, 'vibrate')} 
-      //             />
-      //             <label htmlFor="vibrate">
-      //               <span className="checkIcon" />
-      //               Vibration
-      //             </label>
-      //             </span> */}
-
-      //           </div> {/* controlsCheck */}
-
-      //         </div> {/* container */}
-      //     </div> {/* controls */}
-
-      //     {/* <Footer /> */}
-
-      //     </div> {/* bottomBar */}
-      // </div>
     )
   }
 }
