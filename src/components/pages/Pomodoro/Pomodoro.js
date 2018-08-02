@@ -4,6 +4,7 @@ import React from 'react';
 import Mousetrap from 'mousetrap';
 import { Helmet } from 'react-helmet';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import Modal from 'react-modal';
 import SVGInline from 'react-svg-inline';
 
 import moment from 'moment';
@@ -28,6 +29,18 @@ const SVGS = _SVGS.keys().reduce((images, key) => {
   return images;
 }, {})
 
+const modalStyles = {
+  content : {
+    top: '50%',
+    left: '50%',
+    right: 'auto',
+    bottom: 'auto',
+    marginRight: '-50%',
+    transform: 'translate(-50%, -50%)'
+  }
+};
+
+
 class Pomodoro extends React.Component {
   constructor() {
     super();
@@ -42,14 +55,18 @@ class Pomodoro extends React.Component {
         pomo: 0,
         status: false,
 
+        // User
+        usersRemainTime: [],
+
         // Call
         standbyCall: [],
         calledUser: [],
-        // unreadCall: [],
         readCall: [],
         
         // UI
         dashboard: false,
+        dndMode: localStorage.getItem('react-pomodoro-dnd') || false,
+        callModal: false,
 
         // Pomodoro
         weekOfYear: moment().week(),
@@ -60,7 +77,7 @@ class Pomodoro extends React.Component {
 
         // To-do
         todoList: [],
-        doneTodoList: [],
+        doneTodoList: []
     };
 
     this.switchTab = this.switchTab.bind(this);
@@ -102,21 +119,6 @@ class Pomodoro extends React.Component {
             online: true
           }
         });
-        base.syncState(`/users/${user.uid}/pomo`, {
-          context: this,
-          state: 'pomo',
-          asArray: false
-        });
-        base.syncState(`/users/${user.uid}/activeTodo`, {
-          context: this,
-          state: 'todoList',
-          asArray: true
-        });
-        base.syncState(`/users/${user.uid}/doneTodo`, {
-          context: this,
-          state: 'doneTodoList',
-          asArray: true
-        });
         base.fetch(`/users/${user.uid}/readCall`, {
           context: this,
           asArray: true,
@@ -124,6 +126,45 @@ class Pomodoro extends React.Component {
             limitToLast: 10
           },
           then(data) { this.setState({ readCall: data.reverse() }) }
+        });
+
+        base.fetch(`/users/${this.state.uid}/pomo`, {
+          context: this,
+          state: 'pomo',
+          asArray: false,
+          then() {
+            base.syncState(`/users/${this.state.uid}/pomo`, {
+              context: this,
+              state: 'pomo',
+              asArray: false
+            });
+          }
+        });
+        
+        base.fetch(`/users/${this.state.uid}/activeTodo`, {
+          context: this,
+          state: 'todoList',
+          asArray: true,
+          then() {
+            base.syncState(`/users/${this.state.uid}/activeTodo`, {
+              context: this,
+              state: 'todoList',
+              asArray: true
+            });
+          }
+        });
+        
+        base.fetch(`/users/${this.state.uid}/doneTodo`, {
+          context: this,
+          state: 'doneTodoList',
+          asArray: true,
+          then() {
+            base.syncState(`/users/${this.state.uid}/doneTodo`, {
+              context: this,
+              state: 'doneTodoList',
+              asArray: true
+            });
+          }
         });
 
         // Send call status
@@ -657,6 +698,7 @@ class Pomodoro extends React.Component {
   _setLocalStorage (item, element) {
     let value = element.target.checked;
     localStorage.setItem('react-pomodoro-' + item, value);
+    if(item === 'dnd') this.setState({ dndMode: value })
   }
 
   _getLocalStorage (item) {
@@ -699,7 +741,7 @@ class Pomodoro extends React.Component {
     }
 
     return (
-      <div id="pomodoro" className={ this.state.dashboard ? `dashboard-active` : `dashboard-inactive` }>
+      <div id="pomodoro" className={`${this.state.dashboard ? 'dashboard-active' : 'dashboard-inactive'} ${this.state.dndMode && this.state.play ? 'dnd-on' : 'dnd-off'}`}>
         <div
           className="dashboard-dimmer"
           onClick={
@@ -887,8 +929,8 @@ class Pomodoro extends React.Component {
                                       className="todo-item"
                                     >
                                       <div className="inner">
-                                        <strong className="title">{ item.title }</strong>
-                                        { moment.unix(item.createDate).format('YYYY-MM-DD HH:MM') }
+                                        <strong className="info-title">{ item.title }</strong>
+                                        <span className="info-date">{ moment.unix(item.createDate).format('YYYY-MM-DD HH:MM') }</span>
                                         <div className="todo-btn todo-btn-done">
                                           <div
                                             className="checkbox-done"
@@ -925,15 +967,49 @@ class Pomodoro extends React.Component {
                   }
                   {
                     this.state.todoList.length < 5 &&
-                    <div
-                      className="todo-btn-new"
-                      onClick={(e) => {
-                        let title = window.prompt();
-                        title ? this.setState({ todoList: [...this.state.todoList, { title: title, createDate: moment().unix() }] }) : e.preventDefault();
-                      }}
-                    >
-                      +
-                    </div>
+                    <form>
+                      <div className="todo-add-area">
+                        <div className="input">
+                          <input
+                            type="text"
+                            placeholder="할 일"
+                            maxLength="100"
+                            ref="todoText"
+                            onChange={(e) => {
+                              this.refs.todoText.value.length > 0
+                              ? this.refs.todoSubmit.removeAttribute('disabled')
+                              : this.refs.todoSubmit.setAttribute('disabled', true)
+                            }}
+                          />
+                        </div>
+                        <button
+                          type="submit"
+                          className="submit"
+                          ref="todoSubmit"
+                          onClick={(e) => {
+                            e.preventDefault();
+
+                            if(this.refs.todoText.value.length > 0) {
+                              this.setState({ todoList: [...this.state.todoList, { title: this.refs.todoText.value, createDate: moment().unix() }] })
+                              this.refs.todoText.value = '';
+                            } else {
+                              return false;
+                            }
+                          }}
+                        >
+                          추가
+                        </button>
+                      </div>
+                    </form>
+                    // <div
+                    //   className="todo-btn-new"
+                    //   onClick={(e) => {
+                    //     let title = window.prompt();
+                    //     title ? this.setState({ todoList: [...this.state.todoList, { title: title, createDate: moment().unix() }] }) : e.preventDefault();
+                    //   }}
+                    // >
+                      
+                    // </div>
                   }
                 </div>
                 <div className="done-todos">
@@ -945,8 +1021,8 @@ class Pomodoro extends React.Component {
                         this.state.doneTodoList.map((item, index) => (
                           <div className="todo-item" key={ index }>
                             <div className="inner">
-                              <strong className="title">{ item.title }</strong>
-                              {/* { moment.unix(item.createDate).format('YYYY-MM-DD HH:MM') } */}
+                              <strong className="info-title">{ item.title }</strong>
+                              <span className="info-date">{ moment.unix(item.doneDate).format('YYYY-MM-DD HH:MM') }</span>
                               <div className="todo-btn todo-btn-done">
                                 <div
                                   className="checkbox-done"

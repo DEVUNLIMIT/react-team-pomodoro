@@ -25,6 +25,27 @@ $svg-icons: (
 #pomodoro {
   z-index: 1;
 
+  &.dnd-on {
+    #members-area,
+    #dashboard,
+    #auth-area,
+    &.dashboard-active .dashboard-dimmer {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+  }
+
+  &.dnd-off {
+    #members-area,
+    #dashboard,
+    #auth-area {
+      opacity: 1;
+      pointer-events: auto;
+      transition: opacity 0.3s ease;
+    }
+  }
+
   &::before {
     display: block;
     position: fixed;
@@ -549,6 +570,7 @@ $svg-icons: (
       margin-left: 35px;
       padding: 0;
       border: 0;
+      background-color: transparent;
       font-size: 14px;
       line-height: 40px;
       font-weight: 500;
@@ -1189,6 +1211,58 @@ $svg-icons: (
     }
   }
 
+  .todo-add-area {
+    position: relative;
+    margin-top: 20px;
+    padding-right: 104px;
+
+    .input {
+      overflow: hidden;
+      height: auto;
+      border: 1px solid #979797;
+      border-radius: 4px;
+
+      input {
+        display: block;
+        width: 100%;
+        padding: 0 20px;
+        border: 0;
+        box-sizing: border-box;
+        font-size: 14px;
+        letter-spacing: -0.3px;
+        line-height: 46px;
+      }
+
+      input::placeholder {
+        color: #c0c3cc;
+      }
+    }
+
+    .submit {
+      display: block;
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 96px;
+      height: 48px;
+      border: 0;
+      border-radius: 4px;
+      background-color: #db3918;
+      font-size: 16px;
+      font-weight: 300;
+      letter-spacing: -0.3px;
+      color: #fff;
+      appearance: none;
+      -webkit-appearance: none;
+      cursor: pointer;
+
+      &[disabled] {
+        opacity: 0.75;
+        cursor: default;
+      }
+    }
+  }
+
   .done-todos {
     margin-top: 40px;
   }
@@ -1218,11 +1292,19 @@ $svg-icons: (
       }
     }
 
-    .title {
+    .info-title {
       font-size: 14px;
       font-weight: 500;
       letter-spacing: -0.3px;
       color: #606060;
+    }
+
+    .info-date {
+      display: inline-block;
+      margin-left: 8px;
+      font-size: 12px;
+      letter-spacing: -0.2px;
+      color: rgba(0, 0, 0, 0.4);
     }
   }
 
