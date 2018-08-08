@@ -1,45 +1,35 @@
 import React from 'react';
-// import { Link } from 'react-router-dom';
 
+// General
 import Mousetrap from 'mousetrap';
 import { Helmet } from 'react-helmet';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
-import Modal from 'react-modal';
 import SVGInline from 'react-svg-inline';
 
+// Moment
 import moment from 'moment';
 import 'moment/locale/ko';
 
-import './Pomodoro.scss';
-
+// Firebase
 import firebaseConf from './firebase.conf';
 import firebase from 'firebase/app';
 import 'firebase/database';
 import 'firebase/auth';
-
 import Rebase from 're-base';
+
+// Sass
+import './Pomodoro.scss';
 
 const app = firebase.initializeApp({ ...firebaseConf });
 const base = Rebase.createClass(app.database());
 
-const _SVGS = require.context('../../../svgs', true, /\.svg$/)
+const thisWeekOfYear = moment().week();
+const _SVGS = require.context('../../../svgs', true, /\.svg$/);
 const SVGS = _SVGS.keys().reduce((images, key) => {
   let _key = key.split('./')[1].split('.svg')[0];
   images[_key] = _SVGS(key);
   return images;
-}, {})
-
-const modalStyles = {
-  content : {
-    top: '50%',
-    left: '50%',
-    right: 'auto',
-    bottom: 'auto',
-    marginRight: '-50%',
-    transform: 'translate(-50%, -50%)'
-  }
-};
-
+}, {});
 
 class Pomodoro extends React.Component {
   constructor() {
@@ -49,29 +39,25 @@ class Pomodoro extends React.Component {
         // OAuth
         isAuthenticated: localStorage.getItem('isAuthenticated') || false,
         users: {},
-        uid: null,
-        name: null,
-        picture: null,
-        pomo: 0,
-        status: false,
-
+        
         // User
         usersRemainTime: [],
-
+        
         // Call
-        standbyCall: [],
-        calledUser: [],
-        readCall: [],
+        receivedCall: [],
+        // calledUser: [],
+        callHistory: [],
         
         // UI
         dashboard: false,
         dndMode: localStorage.getItem('react-pomodoro-dnd') || false,
-        callModal: false,
-
+        modal: false,
+        modalData: {},
+        
         // Pomodoro
-        weekOfYear: moment().week(),
         time: 0,
         play: false,
+        status: false,
         timeType: 0,
         title: '',
 
@@ -80,73 +66,71 @@ class Pomodoro extends React.Component {
         doneTodoList: []
     };
 
+    // Bind
     this.switchTab = this.switchTab.bind(this);
     this.todoOnDragEnd = this.todoOnDragEnd.bind(this);
     // Bind early, avoid function creation on render loop
     this.setTimeForCode = this.setTime.bind(this, 1500);
     this.setTimeForSocial = this.setTime.bind(this, 300);
-    this.setTimeForCoffee = this.setTime.bind(this, 900);
+    this.setTimeForCoffee = this.setTime.bind(this, 900)
     this.reset = this.reset.bind(this);
     this.play = this.play.bind(this);
     this.elapseTime = this.elapseTime.bind(this);
 
-    moment.locale('ko');
+    // User info
+    this.UID = null;
+    this.NAME = null;
+    this.PICTURE = null;
 
     window.addEventListener('beforeunload', (e) => {
       if(this.state.isAuthenticated) {
-        base.update(`users/${this.state.uid}`, {
+        base.update(`users/${this.UID}`, {
           data: {
             online: false,
-            state: false
+            status: false
           }
         })
       }
     });
+
+    moment.locale('ko');
   }
 
   componentWillMount() {    
     firebase.auth().onAuthStateChanged((user) => {
       if (user) {
         this.setAuthenticate(true);
-        this.setState({
-          name: user.displayName,
-          uid: user.uid,
-          picture: user.photoURL
-        })
+
+        this.UID = user.uid;
+        this.NAME = user.displayName;
+        this.PICTURE = user.photoURL;
         
         base.update(`/users/${user.uid}`, {
           data: {
             online: true
           }
         });
-        base.fetch(`/users/${user.uid}/readCall`, {
+        base.fetch(`/calls/history/${user.uid}`, {
           context: this,
           asArray: true,
           queries: {
             limitToLast: 10
           },
-          then(data) { this.setState({ readCall: data.reverse() }) }
+          then(data) { this.setState({ callHistory: data.reverse() }) }
         });
 
-        base.fetch(`/users/${this.state.uid}/pomo`, {
+        base.fetch(`/pomos/${this.UID}`, {
           context: this,
           state: 'pomo',
-          asArray: false,
-          then() {
-            base.syncState(`/users/${this.state.uid}/pomo`, {
-              context: this,
-              state: 'pomo',
-              asArray: false
-            });
-          }
+          asArray: false
         });
         
-        base.fetch(`/users/${this.state.uid}/activeTodo`, {
+        base.fetch(`/todos/${this.UID}/activeTodo`, {
           context: this,
           state: 'todoList',
           asArray: true,
           then() {
-            base.syncState(`/users/${this.state.uid}/activeTodo`, {
+            base.syncState(`/todos/${this.UID}/activeTodo`, {
               context: this,
               state: 'todoList',
               asArray: true
@@ -154,12 +138,12 @@ class Pomodoro extends React.Component {
           }
         });
         
-        base.fetch(`/users/${this.state.uid}/doneTodo`, {
+        base.fetch(`/todos/${this.UID}/doneTodo`, {
           context: this,
           state: 'doneTodoList',
           asArray: true,
           then() {
-            base.syncState(`/users/${this.state.uid}/doneTodo`, {
+            base.syncState(`/todos/${this.UID}/doneTodo`, {
               context: this,
               state: 'doneTodoList',
               asArray: true
@@ -168,45 +152,45 @@ class Pomodoro extends React.Component {
         });
 
         // Send call status
-        this.ref = base.listenTo('calls', {
-          context: this,
-          asArray: true,
-          queries: {
-            orderByChild: 'caller',
-            equalTo: this.state.uid
-          },
-          then(data) {
-            this.setState({
-              calledUser: []
-            });
-            data.map((callData, idx) => {
-              return this.setState({
-                calledUser: [...this.state.calledUser, callData.callee]
-              });
-            });
-          }
-        })
+        // this.ref = base.listenTo('calls/live', {
+        //   context: this,
+        //   asArray: true,
+        //   queries: {
+        //     orderByChild: 'caller',
+        //     equalTo: this.UID
+        //   },
+        //   then(data) {
+        //     this.setState({
+        //       calledUser: []
+        //     });
+        //     data.map((callData, idx) => {
+        //       return this.setState({
+        //         calledUser: [...this.state.calledUser, callData.callee]
+        //       });
+        //     });
+        //   }
+        // })
 
         // Stand-by receive Call
-        this.ref = base.listenTo('calls', {
+        this.ref = base.listenTo('calls/live', {
           context: this,
           asArray: true,
           queries: {
             orderByChild: 'callee',
-            equalTo: this.state.uid
+            equalTo: this.UID
           },
           then(data) {
             if(data.length) {
               if(this.state.play) {
                 data.map((callData, idx) => {
                   return this.setState({
-                    standbyCall: [...this.state.standbyCall, callData]
+                    receivedCall: [...this.state.receivedCall, callData]
                   });
                 });
               } else {
                 if(this.refs.notification.checked) {
                   data.map((callData, idx) => {
-                    this.readStandbyCall(callData);
+                    this.readreceivedCall(callData);
                     
                     return new Notification(`incoming call from ${ callData.callerName }`, {
                       icon: "img/coffee.png",
@@ -216,7 +200,7 @@ class Pomodoro extends React.Component {
                   });
                 } else {
                   data.map((callData, idx) => {
-                    base.remove(`calls/${ callData.key }`, (err) => {
+                    base.remove(`calls/live/${ callData.key }`, (err) => {
                       if(err) console.error(err);
                     });
                     
@@ -244,10 +228,10 @@ class Pomodoro extends React.Component {
 
   auth() {
     if(this.state.isAuthenticated) {
-      base.update(`users/${this.state.uid}`, {
+      base.update(`/users/${this.UID}`, {
         data: {
           online: false,
-          state: false
+          status: false
         }
       });
       firebase.auth().signOut();
@@ -267,20 +251,18 @@ class Pomodoro extends React.Component {
         if(result.additionalUserInfo.isNewUser) {
           this.addNewUser(user);
         } else {
-          base.update(`users/${user.uid}`, {
+          base.update(`/users/${user.uid}`, {
             data: {
               online: true,
-              state: false
+              status: false
             }
           });
           this.setSyncUsers();
         }
 
-        this.setState({
-          name: user.displayName,
-          picture: user.photoURL,
-          uid: user.uid
-        });
+        this.UID = user.uid;
+        this.NAME = user.displayName;
+        this.PICTURE = user.photoURL;
       })
       .catch(error => {
         this.setAuthenticate(false);
@@ -289,19 +271,19 @@ class Pomodoro extends React.Component {
   }
 
   addNewUser(user) {
-    base.post(`users/${user.uid}`, {
+    base.post(`/users/${user.uid}`, {
       data: {
         name: user.displayName,
         picture: user.photoURL,
         online: false,
-        state: false,
+        status: false,
       },
       then(err) {
         if(!err) {
-          base.update(`users/${user.uid}`, {
+          base.update(`/users/${user.uid}`, {
             data: {
               online: true,
-              state: false
+              status: false
             }
           });
         }
@@ -318,7 +300,7 @@ class Pomodoro extends React.Component {
   }
 
   setSyncUsers() {
-    base.bindToState('users', {
+    base.bindToState('/users', {
       context: this,
       state: 'users',
       asArray: false
@@ -328,18 +310,18 @@ class Pomodoro extends React.Component {
   donePomo() {
     let vData = {};
 
-    base.fetch(`users/${this.state.uid}/pomo/${this.state.weekOfYear}`, {
+    base.fetch(`pomos/${this.UID}/${thisWeekOfYear}`, {
       context: this,
       asArray: false,
       then(data) {
         if(typeof data === 'object') {
-          vData[this.state.weekOfYear] = 1;
-          base.post(`users/${this.state.uid}/pomo`, {
+          vData[thisWeekOfYear] = 1;
+          base.post(`pomos/${this.UID}`, {
             data: vData
           });
         } else {
-          vData[this.state.weekOfYear] = ++data;
-          base.update(`users/${this.state.uid}/pomo`, {
+          vData[thisWeekOfYear] = ++data;
+          base.update(`pomos/${this.UID}`, {
             data: vData
           });
         }
@@ -348,57 +330,60 @@ class Pomodoro extends React.Component {
   }
 
   viewTasks(Id) {
-    if(this.state.viewTaskData && this.state.viewTaskData.uid !== Id) {
-      base.fetch(`users/${Id}/doneTodo`, {
-        context: this,
-        asArray: true,
-        then(data) {
-          data.length
-          ? this.setState({
-            viewTaskData: {
-              uid: Id,
-              data: data
-            }
-          })
-          : this.setState({
-            viewTaskData: {
-              uid: Id,
-              data: false
-            }
-          })
+    base.fetch(`/todos/${Id}/doneTodo`, {
+      context: this,
+      asArray: true
+    }).then(data => {
+      this.setState({
+        userDoneTodos: {
+          uid: Id,
+          data: data
         }
       });
-    } else {
-      this.setState({ viewTaskData: {} });
-    }
+    }).catch(error => {
+      this.setState({
+        userDoneTodos: {
+          uid: Id,
+          data: false
+        }
+      });
+    });
   }
 
-  callUser(calleeId) {
-    if(this.state.calledUser.find((calleeIds) => { return calleeIds === calleeId }) !== calleeId) {
-      let message = window.prompt();
-      if(message) {
-        base.push(`/calls`, {
-          data: {
-            caller: this.state.uid,
-            callee: calleeId,
-            message: message,
-            sendDate: moment().unix()
-          }
-        });
-      } else {
-        return false
-      }
-      return true;
-    } else {
-      return false;
-    }
+  createCallModal(caller) {
+    this.setState({ modal: 'call', modalData: { key: caller, ...this.state.users[caller] } });
   }
 
-  readStandbyCall(callData) {
+  createGeneralModal(msg) {
+    this.setState({ modal: 'general', modalData: { message: msg } });
+  }
+
+  closeModal() {
+    this.setState({ modal: '', modalData: {} });
+  }
+
+  callUser(calleeId, message) {
+    // if(this.state.calledUser.find((calleeIds) => { return calleeIds === calleeId }) !== calleeId) {
+      base.push(`/calls/live`, {
+        data: {
+          caller: this.UID,
+          callee: calleeId,
+          message: message,
+          sendDate: moment().unix()
+        }
+      });
+
+      this.closeModal();
+    // } else {
+      // return false;
+    // }
+  }
+
+  readreceivedCall(callData) {
     base
-    .remove(`calls/${callData.key}`)
+    .remove(`calls/live/${callData.key}`)
     .then(() => {
-      base.push(`users/${this.state.uid}/readCall`, {
+      base.push(`calls/history/${this.UID}`, {
         data: {
           ...callData,
           readDate: moment().unix()
@@ -408,8 +393,8 @@ class Pomodoro extends React.Component {
         }
       });
       this.setState((prevState) => { return {
-        standbyCall: [],
-        readCall: [callData, ...prevState.readCall]
+        receivedCall: [],
+        callHistory: [callData, ...prevState.callHistory]
       }});
     })
     .catch(error => {
@@ -480,16 +465,25 @@ class Pomodoro extends React.Component {
     
     let clickedItem = e.target;
     let remainItems = Array.from(this.refs.dashboardTab.childNodes);
-    let container = this.refs.dashboardContainer;
     let idx = [...e.target.parentNode.children].indexOf(clickedItem);
+    let container = this.refs.dashboardContainer;
+    let activeContainer = Array.from(container.childNodes);
 
     remainItems.splice(idx, 1);
 
-    // Switch class
+    container.classList.add('is-moving');
+
+    // Switch Tab button
     clickedItem.classList.add('is-active');
     remainItems.forEach(element => element.classList.remove('is-active'));
 
-    // Switch content
+    // Switch Container
+    activeContainer.forEach(element => element.classList.remove('is-active'));
+    activeContainer[idx].classList.add('is-active');
+
+    setTimeout(() => {
+      container.classList.remove('is-moving');
+    }, 300);
     container.style.transform = `translateX(-${ idx * container.clientWidth }px)`
   }
   
@@ -500,9 +494,9 @@ class Pomodoro extends React.Component {
       this.alert();
       if(this.state.timeType === 1500) {
         this.donePomo();
-        if(this.state.standbyCall.length) {
-          this.state.standbyCall.map((callData, idx) => {
-            this.readStandbyCall(callData);
+        if(this.state.receivedCall.length) {
+          this.state.receivedCall.map((callData, idx) => {
+            this.readreceivedCall(callData);
             
             return new Notification(`incoming call from ${callData.callerName}`, {
               icon: "img/coffee.png",
@@ -567,46 +561,51 @@ class Pomodoro extends React.Component {
       switch(this.state.timeType) {
         case 1500:
           this.setState({ status: 'working' });
-          base.update(`users/${this.state.uid}`, {
+          base.update(`users/${this.UID}`, {
             data: {
-              state: 'working'
+              status: 'working'
             }
           });
           break;
         case 900:
           this.setState({ status: 'conference' });
-          base.update(`users/${this.state.uid}`, {
+          base.update(`users/${this.UID}`, {
             data: {
-              state: 'conference'
+              status: 'conference'
             }
           });
           break;
         case 300:
           this.setState({ status: 'false' });
-          base.update(`users/${this.state.uid}`, {
+          base.update(`users/${this.UID}`, {
             data: {
-              state: 'rest'
+              status: 'rest'
             }
           });
           break;
         default:
-          base.update(`users/${this.state.uid}`, {
+          base.update(`users/${this.UID}`, {
             data: {
-              state: false
+              status: false
             }
           });
       }
     }
   }
 
+  resetConfirm(confirm) {
+    confirm ? this.reset() : this.closeModal();
+  }
+
   reset(resetFor = this.state.time) {
     clearInterval(this.interval);
     this.format(resetFor);
-    this.setState({ play: false, status: false });
+    this.setState({ time: this.state.timeType, play: false, status: false });
+    this.closeModal();
 
-    if(this.state.standbyCall.length) {
-      this.state.standbyCall.map((callData, idx) => {
-        this.readStandbyCall(callData);
+    if(this.state.receivedCall.length) {
+      this.state.receivedCall.map((callData, idx) => {
+        this.readreceivedCall(callData);
         
         return new Notification(`incoming call from ${callData.callerName}`, {
           icon: "img/coffee.png",
@@ -617,9 +616,9 @@ class Pomodoro extends React.Component {
     }
 
     if(this.state.isAuthenticated && this.state.timeType === 1500) {
-      base.update(`users/${this.state.uid}`, {
+      base.update(`users/${this.UID}`, {
         data: {
-          state: false
+          status: false
         }
       });
     }
@@ -627,7 +626,7 @@ class Pomodoro extends React.Component {
 
   togglePlay() {
     if (true === this.state.play) {
-      return this.reset();
+      return this.resetConfirm();
     }
 
     return this.play();
@@ -636,9 +635,9 @@ class Pomodoro extends React.Component {
   setTime(newTime) {
     this.restartInterval();
 
-    base.update(`users/${this.state.uid}`, {
+    base.update(`users/${this.UID}`, {
       data: {
-        state: false
+        status: false
       }
     });
     
@@ -672,7 +671,7 @@ class Pomodoro extends React.Component {
   }
 
   startShortcuts() {
-    Mousetrap.bind('space', this.togglePlay.bind(this));
+    // Mousetrap.bind('space', this.togglePlay.bind(this));
     Mousetrap.bind(['shift+left', 'meta+left'], this.toggleMode.bind(this,-1));
     Mousetrap.bind(['shift+right', 'meta+right'], this.toggleMode.bind(this,1));
   }
@@ -740,17 +739,21 @@ class Pomodoro extends React.Component {
       clockStrokes.push(<div className="stroke" style={{ "transform": `rotate(${ i * 6 }deg)` }} key={ i }></div>);
     }
 
-    return (
-      <div id="pomodoro" className={`${this.state.dashboard ? 'dashboard-active' : 'dashboard-inactive'} ${this.state.dndMode && this.state.play ? 'dnd-on' : 'dnd-off'}`}>
+    return [
+      <div id="pomodoro" className={`${this.state.play ? 'is-play' : ''} ${this.state.modal ? 'modal-on' : 'modal-off'} ${this.state.dashboard ? 'dashboard-active' : 'dashboard-inactive'} ${this.state.dndMode === 'true' && this.state.play ? 'dnd-on' : 'dnd-off'}`} key="pomodoro">
         <div
           className="dashboard-dimmer"
-          onClick={
-            (e) => {
-              this.setState((prevState) => {
-                return { dashboard: !prevState.dashboard }
-              })
-            }
-          }
+          onClick={(e) => {
+            this.setState((prevState) => {
+              return { dashboard: !prevState.dashboard }
+            })
+          }}
+        />
+        <div
+          className="modal-dimmer"
+          onClick={(e) => {
+            this.closeModal();
+          }}
         />
         <Helmet>
           <title>{ this.state.title }</title>
@@ -768,7 +771,7 @@ class Pomodoro extends React.Component {
             <div className="control-area">
               {
                 this.state.play
-                ? <button className="btn-stop" id="control-stop" onClick={ this.reset }>
+                ? <button className="btn-stop" id="control-stop" onClick={ this.createGeneralModal.bind(this, '뽀모도로 타이머 중지 시, 타이머는 리셋됩니다.\n정말 중지하시겠습니까?') }>
                   타이머 종료
                 </button>
                 : <button className="btn-play" id="control-play" onClick={ this.play }>
@@ -779,15 +782,15 @@ class Pomodoro extends React.Component {
           </div>
         </div>
         {
-          this.state.isAuthenticated && this.state.uid &&
+          this.state.isAuthenticated && this.UID &&
           <div id="todo-now" className={`${ this.state.status ? 'is-' + this.state.status : 'is-inactive' }`}>
             <div className="inner">
               <div className="thumbnail">
                 <div className="status"></div>
-                <img className="picture" src={ this.state.picture } alt={`${this.state.name}의 프로필 사진`} />
+                <img className="picture" src={ this.PICTURE } alt={`${this.NAME}의 프로필 사진`} />
               </div>
               <div className="info">
-                <strong className="name">{ this.state.name }</strong>
+                <strong className="name">{ this.NAME }</strong>
                 {
                   this.state.todoList.length > 0 &&
                   <span className="todo">{ this.state.todoList[0].title }</span>
@@ -819,11 +822,11 @@ class Pomodoro extends React.Component {
             <div className="dashboard-tab" ref="dashboardTab">
               <button className="tab-item is-active" onClick={ this.switchTab }>Preset</button>
               <button className="tab-item" onClick={ this.switchTab }>To-do</button>
-              <button className={`tab-item ${this.state.standbyCall.length ? 'badge-on' : ''}`} onClick={ this.switchTab }>Call</button>
+              <button className={`tab-item ${this.state.receivedCall.length ? 'badge-on' : ''}`} onClick={ this.switchTab }>Call</button>
               <button className="tab-item" onClick={ this.switchTab }>Members</button>
             </div>
             <div className="dashboard-container" ref="dashboardContainer">
-              <div className="dashboard-content" id="dashboard-setting">
+              <div className="dashboard-content is-active" id="dashboard-setting">
                 <div className="setting-type">
                   <h3 className="menu-title">뽀모도르 모드</h3>
                   <div className="type-inner">
@@ -888,7 +891,7 @@ class Pomodoro extends React.Component {
                         <label htmlFor="audio" className="toggle" />
                       </div>
                     </li>
-                    <li className="option">
+                    <li className="option is-disableable">
                       <div className="label">
                         <strong className="label-name">방해금지 모드</strong>
                         <span className="label-desc">UI요소를 최대한 배제하여 업무와 뽀모도로 타이머에만 집중할 수 있게 합니다.</span>
@@ -1001,15 +1004,6 @@ class Pomodoro extends React.Component {
                         </button>
                       </div>
                     </form>
-                    // <div
-                    //   className="todo-btn-new"
-                    //   onClick={(e) => {
-                    //     let title = window.prompt();
-                    //     title ? this.setState({ todoList: [...this.state.todoList, { title: title, createDate: moment().unix() }] }) : e.preventDefault();
-                    //   }}
-                    // >
-                      
-                    // </div>
                   }
                 </div>
                 <div className="done-todos">
@@ -1054,11 +1048,11 @@ class Pomodoro extends React.Component {
               </div>
               <div className="dashboard-content" id="dashboard-call">
                 {
-                  this.state.users && !!this.state.standbyCall.length &&
+                  this.state.users && !!this.state.receivedCall.length &&
                   <div className="calls-list type-unread">
                     <strong className="list-title">읽지 않은 메세지</strong>
                     {
-                      this.state.standbyCall.map((item, index) => {
+                      this.state.receivedCall.map((item, index) => {
                         return (
                           <div className={ `calls ${ this.state.users[item.caller].online ? this.state.users[item.caller].state ? 'is-' + this.state.users[item.caller].state : 'is-inactive' : 'is-offline' }` } key={ index }>
                             <div className="thumbnail">
@@ -1081,11 +1075,11 @@ class Pomodoro extends React.Component {
                   </div>
                 }
                 {
-                  this.state.users && !!this.state.readCall.length &&
+                  this.state.users && !!this.state.callHistory.length &&
                   <div className="calls-list type-read">
                     <strong className="list-title">읽은 메세지</strong>
                     {
-                      this.state.readCall.map((item, index) => {
+                      this.state.callHistory.map((item, index) => {
                         return (
                           <div className={ `calls ${ this.state.users[item.caller].online ? this.state.users[item.caller].state ? 'is-' + this.state.users[item.caller].state : 'is-inactive' : 'is-offline' }` } key={ index }>
                             <div className="thumbnail">
@@ -1113,12 +1107,12 @@ class Pomodoro extends React.Component {
                   {
                     this.state.isAuthenticated && this.state.users && Object.keys(this.state.users).map((key, idx) => {
                       let data = this.state.users[key];
-                      if(key === this.state.uid) return false;
+                      if(key === this.UID) return false;
                       if(key === 'null') return false;
 
                       return (
                         <li
-                          className={ `member ${ data.online ? data.state ? 'is-' + data.state : 'is-inactive' : 'is-offline' }` }
+                          className={ `member ${ data.online ? data.status ? 'is-' + data.status : 'is-inactive' : 'is-offline' }` }
                           key={ idx }
                           data-uid={ key }
                         >
@@ -1132,7 +1126,7 @@ class Pomodoro extends React.Component {
                                 { data.name }
                                 <span className="state">
                                   {
-                                    data.state
+                                    data.status
                                     ? '업무중'
                                     : ''
                                   }
@@ -1141,8 +1135,8 @@ class Pomodoro extends React.Component {
                               <span className="pomo-week">
                                 Pomo
                                 {
-                                  data.pomo && data.pomo[this.state.weekOfYear] && data.pomo[this.state.weekOfYear]
-                                  ? <i className="count">{` x ${data.pomo[this.state.weekOfYear]}`}</i>
+                                  data.pomo && data.pomo[thisWeekOfYear] && data.pomo[thisWeekOfYear]
+                                  ? <i className="count">{` x ${data.pomo[thisWeekOfYear]}`}</i>
                                   : <i className="count"> x 0</i>
                                 }
                               </span>
@@ -1151,14 +1145,15 @@ class Pomodoro extends React.Component {
                               <button className="button btn-tasks" onClick={ this.viewTasks.bind(this, key) }>View all tasks</button>
                               {
                                 data.online
-                                ? <button className="button btn-call" onClick={ this.callUser.bind(this, key) }>Call</button>
+                                ? <button className="button btn-call" onClick={ this.createCallModal.bind(this, key) }>Call</button>
                                 : <button className="button btn-call" disabled={ true }>Call</button>
                               }
                             </div>
                           </div>
                           <ul className="donetodo-area">
                             {
-                              this.state.viewTaskData && this.state.viewTaskData.uid === key && this.state.viewTaskData.data.map((data, idx) => {
+                              this.state.userDoneTodos && this.state.userDoneTodos.uid === key &&
+                              this.state.userDoneTodos.data.map((data, idx) => {
                                 return (
                                   <li className="todo" key={ idx }>
                                     <strong>{ data.title }</strong>
@@ -1186,12 +1181,12 @@ class Pomodoro extends React.Component {
                 {
                   Object.keys(this.state.users).map((key, idx) => {
                     let data = this.state.users[key];
-                    if(key === this.state.uid) return false;
+                    if(key === this.UID) return false;
                     if(key === 'null') return false;
 
                     return (
                       <li
-                        className={ `member ${ data.online ? data.state ? 'is-' + data.state : 'is-inactive' : 'is-offline' }` }
+                        className={ `member ${ data.online ? data.status ? 'is-' + data.status : 'is-inactive' : 'is-offline' }` }
                         key={ idx }
                         data-uid={ key }
                       >
@@ -1210,7 +1205,7 @@ class Pomodoro extends React.Component {
         }
         {
           this.state.isAuthenticated
-          ? this.state.name && (
+          ? this.NAME && (
             <div id="auth-area">
               <div id="customBtn" className="customGPlusSignIn" onClick={() => this.auth('google')}>
                 <span className="icon"></span>
@@ -1226,8 +1221,90 @@ class Pomodoro extends React.Component {
             </div>
           )
         }
+      </div>,
+      <div id="modal" className={ this.state.modal ? 'type-' + this.state.modal : '' } key="modal">
+        {
+          this.state.modal === 'call' &&
+          <div className="inner">
+            <h2 className="title">Call</h2>
+            <div className={`profile-area ${this.state.users[this.state.modalData.key].status ? 'is-' + this.state.users[this.state.modalData.key].status : 'is-inactive'}`}>
+              <div className="thumbnail">
+                <div className="status" />
+                <img className="picture" src={ this.state.modalData.picture } alt={`${this.state.modalData.name}의 프로필 사진`} />
+              </div>
+              <div className="info">
+                <strong className="name">{ this.state.modalData.name }</strong>
+              </div>
+            </div>
+            <div className="input-area">
+              <input
+                type="text"
+                placeholder="메세지"
+                maxLength="100"
+                ref="callText"
+              />
+            </div>
+            <div className="button-area">
+              <button
+                className="button btn-normal"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.persist();
+                  this.closeModal();
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="button btn-primary"
+                onClick={(e) => {
+                  e.preventDefault(); 
+                  e.persist();
+                  if(this.refs.callText.value.length > 0) {
+                    this.callUser(this.state.modalData.key, this.refs.callText.value)
+                  } else {
+                    alert('내용을 입력해주세요.');
+                  }
+                }}
+              >
+                Call
+              </button>
+            </div>
+          </div>
+        }
+        {
+          this.state.modal === 'general' &&
+          <div className="inner">
+            <h2 className="title">Caution</h2>
+            <p className="message">
+              {
+                this.state.modalData.message.split('\n').map((text, key) => {
+                  return key
+                  ? <React.Fragment key={ key }><br />{ text }</React.Fragment>
+                  : <React.Fragment key={ key }>{ text }</React.Fragment>
+                })
+              }
+            </p>
+            <div className="button-area">
+              <button
+                className="button btn-primary"
+                onClick={ this.resetConfirm.bind(this, false) }
+              >
+                돌아가기
+              </button>
+              <button
+                type="submit"
+                className="button btn-normal"
+                onClick={ this.resetConfirm.bind(this, true) }
+              >
+                중지
+              </button>
+            </div>
+          </div>
+        }
       </div>
-    )
+    ]
   }
 }
 

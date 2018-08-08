@@ -32,7 +32,7 @@ $svg-icons: (
     &.dashboard-active .dashboard-dimmer {
       opacity: 0;
       pointer-events: none;
-      transition: opacity 0.3s ease;
+      transition: all 0.3s ease;
     }
   }
 
@@ -42,7 +42,52 @@ $svg-icons: (
     #auth-area {
       opacity: 1;
       pointer-events: auto;
-      transition: opacity 0.3s ease;
+      transition: all 0.3s ease;
+    }
+  }
+
+  &.modal-on {
+    -webkit-filter: blur(10px);
+    filter: blur(10px);
+    transform: scale(1.02);
+
+    & + #modal {
+      display: block;
+    }
+
+    .modal-dimmer {
+      position: fixed;
+      top: -10%;
+      right: -10%;
+      bottom: -10%;
+      left: -10%;
+      z-index: 20;
+      background-color: rgba(0, 0, 0, 0.5);
+      opacity: 1;
+      pointer-events: auto;
+      transition: all 0.2s ease;
+    }
+  }
+
+  &.modal-off {
+    & + #modal {
+      display: none;
+    }
+
+    .modal-dimmer {
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.2s ease;
+    }
+  }
+
+  &.is-play {
+    #dashboard-setting {
+      .setting-type,
+      .setting-options .option.is-disableable {
+        opacity: 0.4;
+        pointer-events: none;
+      }
     }
   }
 
@@ -229,10 +274,6 @@ $svg-icons: (
         -webkit-clip-path: polygon(0 0, 0% 100%, 100% 50%);
         clip-path: polygon(0 0, 0% 100%, 100% 50%);
       }
-    }
-
-    .btn-stop {
-
     }
   }
 }
@@ -622,7 +663,14 @@ $svg-icons: (
     white-space: nowrap;
     transition: transform 0.3s ease;
 
+    &.is-moving {
+      .dashboard-content {
+        visibility: visible !important;
+      }
+    }
+
     .dashboard-content {
+      visibility: hidden;
       display: inline-block;
       overflow-y: scroll;
       width: 100%;
@@ -630,6 +678,10 @@ $svg-icons: (
       padding: 32px 40px;
       box-sizing: border-box;
       vertical-align: top;
+
+      &.is-active {
+        visibility: visible;
+      }
     }
   }
 }
@@ -1420,5 +1472,204 @@ $svg-icons: (
     letter-spacing: -0.3px;
     text-align: center;
     color: rgba(0, 0, 0, 0.72);
+  }
+}
+
+#modal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 21;
+  width: 680px;
+  margin: -138px 0 0 -340px;
+  padding: 24px 30px;
+  background-color: #fff;
+  border-radius: 12px;
+  box-sizing: border-box;
+
+  &.type-general {
+    min-height: 138px;
+  }
+
+  &.type-call {
+    min-height: 276px;
+  }
+
+  .title {
+    margin: 0;
+    font-size: 16px;
+    letter-spacing: -0.3px;
+    color: rgba(0, 0, 0, 0.72);
+  }
+
+  .message {
+    margin: 8px 0 0;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.5;
+    letter-spacing: -0.3px;
+    color: rgba(0, 0, 0, 0.72);
+  }
+
+  .button-area {
+    margin-top: 10px;
+  }
+
+  .profile-area {
+    margin-top: 18px;
+
+    &.is-inactive {
+      .status {
+        opacity: 0;
+        transform: scale(0.5);
+        transition: all 0.15s ease-in-out;
+      }
+    }
+  
+    .status {
+      position: absolute;
+      top: -6px;
+      left: -6px;
+      width: 28px;
+      height: 28px;
+      border: 2px solid #fff;
+      border-radius: 100%;
+      box-sizing: border-box;
+      text-align: center;
+      opacity: 1;
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: 65%;
+      transform: scale(1);
+      transition: all 0.15s ease-in-out;
+    }
+  
+    &.is-working .status {
+      background-color: #7ee637;
+      background-image: url(map-get($svg-icons, 'working'));
+    }
+  
+    &.is-rest .status {
+      background-color: #876347;
+      background-image: url(map-get($svg-icons, 'rest'));
+    }
+  
+    &.is-conference .status {
+      background-color: #f9c53b;
+      background-image: url(map-get($svg-icons, 'conference'));
+    }
+  
+    .thumbnail {
+      display: inline-block;
+      position: relative;
+      width: 48px;
+      height: 48px;
+      margin: 0 auto;
+      border-radius: 100%;
+  
+      &::before {
+        display: block;
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        border: 1.5px solid #c0c3cc;
+        border-radius: 100%;
+        content: "";
+      }
+    }
+  
+    .picture {
+      display: block;
+      width: 100%;
+      border-radius: 100%;
+    }
+
+    .info {
+      display: inline-block;
+      margin-left: 20px;
+      vertical-align: top;
+    }
+
+    .name {
+      margin-top: 2px;
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+      color: #4f4f4f;
+    }
+  }
+
+  .input-area {
+    overflow: hidden;
+    margin-top: 20px;
+    border: 1px solid #979797;
+    border-radius: 4px;
+
+    input {
+      display: block;
+      width: 100%;
+      padding: 0 20px;
+      font-size: 14px;
+      letter-spacing: -0.3px;
+      color: #000;
+      line-height: 46px;
+      border: 0;
+      box-sizing: border-box;
+    }
+
+    input::placeholder {
+      color: #c0c3cc;
+    }
+  }
+
+  .button-area {
+    margin-top: 24px;
+  }
+}
+
+.button-area {
+  flex: 1;
+  flex-grow: 1;
+  text-align: right;
+
+  .button {
+    height: 40px;
+    margin: 0 0 0 8px;
+    padding: 8px 26px;
+    border: 1px solid #eb4e2f;
+    border-radius: 4px;
+    box-sizing: border-box;
+    font-size: 16px;
+    letter-spacing: -0.3px;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+  
+    &[disabled] {
+      opacity: 0.5;
+      cursor: default;
+      transition: opacity 0.2s ease;
+    }
+  
+    &:focus {
+      outline: 0;
+    }
+    
+    &:first-child {
+      margin: 0;
+    }
+  
+    &.btn-primary {
+      background-color: #eb4e2f;
+      font-weight: 400;
+      color: #fff;
+    }
+  
+    &.btn-normal {
+      background-color: #fff;
+      font-weight: 500;
+      color: #eb4e2f;
+    }
   }
 }
