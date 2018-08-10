@@ -419,7 +419,6 @@ class Pomodoro extends React.Component {
     });
 
     if(this.refs.notification.checked) {
-      console.log(callData);
       new Notification(`wtf incoming call from ${ callData.callerName }`, {
         icon: "img/coffee.png",
         lang: "ko",
@@ -1134,7 +1133,7 @@ class Pomodoro extends React.Component {
                   {
                     this.state.isAuthenticated && this.state.users && Object.keys(this.state.users).map((key, idx) => {
                       let data = this.state.users[key];
-                      // if(key === this.UID) return false;
+                      if(key === this.UID) return false;
                       if(key === 'null') return false;
 
                       return (
