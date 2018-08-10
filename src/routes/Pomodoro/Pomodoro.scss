@@ -1029,7 +1029,12 @@ $svg-icons: (
     color: #adadad;
 
     .count {
+      display: inline-block;
+      margin: 4px 0 0 4px;
+      // font-family: 'Renner', snas-serif;
+      // font-weight: 200;
       font-style: normal;
+      vertical-align: top;
     }
   }
 }
@@ -1052,6 +1057,7 @@ $svg-icons: (
     border-radius: 4px;
     color: rgba(144, 145, 153, 0.45);
     box-sizing: border-box;
+    text-align: left;
     cursor: pointer;
 
     &.is-selected {
@@ -1221,10 +1227,6 @@ $svg-icons: (
       height: 100%;
       appearance: none;
       -webkit-appearance: none;
-
-      &:focus {
-        outline: 0;
-      }
 
       &:checked + .toggle {
         background-color: #ffeae6;
@@ -1495,6 +1497,10 @@ $svg-icons: (
     min-height: 276px;
   }
 
+  .inner {
+    position: relative;
+  }
+
   .title {
     margin: 0;
     font-size: 16px;
@@ -1516,7 +1522,10 @@ $svg-icons: (
   }
 
   .profile-area {
+    display: table;
+    min-height: 48px;
     margin-top: 18px;
+    padding-left: 68px;
 
     &.is-inactive {
       .status {
@@ -1561,7 +1570,8 @@ $svg-icons: (
   
     .thumbnail {
       display: inline-block;
-      position: relative;
+      position: absolute;
+      left: 0;
       width: 48px;
       height: 48px;
       margin: 0 auto;
@@ -1587,9 +1597,8 @@ $svg-icons: (
     }
 
     .info {
-      display: inline-block;
-      margin-left: 20px;
-      vertical-align: top;
+      display: table-cell;
+      vertical-align: middle;
     }
 
     .name {
@@ -1598,6 +1607,13 @@ $svg-icons: (
       font-weight: 600;
       letter-spacing: -0.3px;
       color: #4f4f4f;
+    }
+
+    .is-working {
+      display: block;
+      margin-top: 4px;
+      font-size: 14px;
+      color: rgba(0, 0, 0, 0.4);
     }
   }
 
@@ -1671,5 +1687,60 @@ $svg-icons: (
       font-weight: 500;
       color: #eb4e2f;
     }
+  }
+}
+
+#notifications {
+  position: fixed;
+  top: 40px;
+  right: 40px;
+  max-width: 424px;
+  z-index: 1100;
+
+  .notification {
+    display: table;
+    position: relative;
+    width: 424px;
+    height: 80px;
+    margin-top: 12px;
+    padding: 20px 32px 20px 84px;
+    border-radius: 8px;
+    background-color: #fff;
+    box-shadow: 0 2px 15px 0 rgba(0, 0, 0, 0.24);
+    box-sizing: border-box;
+    animation: notification 0.5s ease;
+
+    &:first-child {
+      margin-top: 0;
+    }
+    
+    .icon {
+      position: absolute;
+      top: 20px;
+      left: 24px;
+      width: 40px;
+      height: 40px;
+    }
+
+    .message {
+      display: table-cell;
+      font-size: 14px;
+      font-weight: 400;
+      line-height: 1.5;
+      letter-spacing: -0.3px;
+      vertical-align: middle;
+      color: rgba(0, 0, 0, 0.72);
+    }
+  }
+}
+
+@keyframes notification {
+  from {
+    transform: translateX(100px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
   }
 }

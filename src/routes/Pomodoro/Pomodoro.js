@@ -1,17 +1,20 @@
 import React from 'react';
 
 // General
-import Mousetrap from 'mousetrap';
 import { Helmet } from 'react-helmet';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import Mousetrap from 'mousetrap';
+
+// SVG
 import SVGInline from 'react-svg-inline';
+import SVGS from '../../tools/svg';
 
 // Moment
 import moment from 'moment';
 import 'moment/locale/ko';
 
 // Firebase
-import firebaseConf from './firebase.conf';
+import firebaseCfg from '../../firebase.conf';
 import firebase from 'firebase/app';
 import 'firebase/database';
 import 'firebase/auth';
@@ -20,16 +23,11 @@ import Rebase from 're-base';
 // Sass
 import './Pomodoro.scss';
 
-const app = firebase.initializeApp({ ...firebaseConf });
+const app = firebase.initializeApp({ ...firebaseCfg });
 const base = Rebase.createClass(app.database());
 
 const thisWeekOfYear = moment().week();
-const _SVGS = require.context('../../../svgs', true, /\.svg$/);
-const SVGS = _SVGS.keys().reduce((images, key) => {
-  let _key = key.split('./')[1].split('.svg')[0];
-  images[_key] = _SVGS(key);
-  return images;
-}, {});
+
 
 class Pomodoro extends React.Component {
   constructor() {
@@ -38,7 +36,10 @@ class Pomodoro extends React.Component {
     this.state = {
         // OAuth
         isAuthenticated: localStorage.getItem('isAuthenticated') || false,
+
+        // Firebase
         users: {},
+        pomos: {},
         
         // User
         usersRemainTime: [],
@@ -53,6 +54,7 @@ class Pomodoro extends React.Component {
         dndMode: localStorage.getItem('react-pomodoro-dnd') || false,
         modal: false,
         modalData: {},
+        notifications: [],
         
         // Pomodoro
         time: 0,
@@ -67,8 +69,6 @@ class Pomodoro extends React.Component {
     };
 
     // Bind
-    this.switchTab = this.switchTab.bind(this);
-    this.todoOnDragEnd = this.todoOnDragEnd.bind(this);
     // Bind early, avoid function creation on render loop
     this.setTimeForCode = this.setTime.bind(this, 1500);
     this.setTimeForSocial = this.setTime.bind(this, 300);
@@ -76,6 +76,8 @@ class Pomodoro extends React.Component {
     this.reset = this.reset.bind(this);
     this.play = this.play.bind(this);
     this.elapseTime = this.elapseTime.bind(this);
+    this.switchTab = this.switchTab.bind(this);
+    this.todoOnDragEnd = this.todoOnDragEnd.bind(this);
 
     // User info
     this.UID = null;
@@ -119,9 +121,9 @@ class Pomodoro extends React.Component {
           then(data) { this.setState({ callHistory: data.reverse() }) }
         });
 
-        base.fetch(`/pomos/${this.UID}`, {
+        base.bindToState(`/pomos`, {
           context: this,
-          state: 'pomo',
+          state: 'pomos',
           asArray: false
         });
         
@@ -188,25 +190,9 @@ class Pomodoro extends React.Component {
                   });
                 });
               } else {
-                if(this.refs.notification.checked) {
-                  data.map((callData, idx) => {
-                    this.readreceivedCall(callData);
-                    
-                    return new Notification(`incoming call from ${ callData.callerName }`, {
-                      icon: "img/coffee.png",
-                      lang: "ko",
-                      body: callData.message
-                    });
-                  });
-                } else {
-                  data.map((callData, idx) => {
-                    base.remove(`calls/live/${ callData.key }`, (err) => {
-                      if(err) console.error(err);
-                    });
-                    
-                    return console.log('incoming call but not allowed notification');
-                  });
-                }
+                data.map((callData, idx) => {
+                  return this.readReceivedCall(callData);
+                });
               }
             }
           }
@@ -224,6 +210,10 @@ class Pomodoro extends React.Component {
     this.setDefaultTime();
     this.startShortcuts();
     Notification.requestPermission();
+  }
+
+  componentWillUpdate() {
+
   }
 
   auth() {
@@ -362,6 +352,19 @@ class Pomodoro extends React.Component {
     this.setState({ modal: '', modalData: {} });
   }
 
+  createNotification(data) {
+    this.setState(prevState => ({ notifications: [...prevState.notifications, data] }));
+  }
+
+  closeNotification(index) {
+    this.setState(prevState => {
+      let arr = [...prevState.notifications];
+      arr.splice(index, 1);
+
+      return { notifications: arr }
+    });
+  }
+
   callUser(calleeId, message) {
     // if(this.state.calledUser.find((calleeIds) => { return calleeIds === calleeId }) !== calleeId) {
       base.push(`/calls/live`, {
@@ -371,6 +374,19 @@ class Pomodoro extends React.Component {
           message: message,
           sendDate: moment().unix()
         }
+      })
+      .then(data => {
+        if(this.state.users[calleeId].status) {
+          this.createNotification({
+            type: 'call',
+            message: '메세지가 전송되었습니다. 상대의 뽀모도로가 종료되는 즉시 메세지가 전달됩니다.'
+          });
+        } else {
+          this.createNotification({
+            type: 'call',
+            message: '메세지가 전송되었습니다.'
+          });
+        }
       });
 
       this.closeModal();
@@ -379,7 +395,8 @@ class Pomodoro extends React.Component {
     // }
   }
 
-  readreceivedCall(callData) {
+  readReceivedCall(callData) {
+
     base
     .remove(`calls/live/${callData.key}`)
     .then(() => {
@@ -400,6 +417,20 @@ class Pomodoro extends React.Component {
     .catch(error => {
       console.error(error);
     });
+
+    if(this.refs.notification.checked) {
+      console.log(callData);
+      new Notification(`wtf incoming call from ${ callData.callerName }`, {
+        icon: "img/coffee.png",
+        lang: "ko",
+        body: callData.message
+      });
+    } else {
+      this.createNotification({
+        type: 'call',
+        message: callData.message
+      })
+    }
   }
 
   // To-do
@@ -496,13 +527,7 @@ class Pomodoro extends React.Component {
         this.donePomo();
         if(this.state.receivedCall.length) {
           this.state.receivedCall.map((callData, idx) => {
-            this.readreceivedCall(callData);
-            
-            return new Notification(`incoming call from ${callData.callerName}`, {
-              icon: "img/coffee.png",
-              lang: "ko",
-              body: callData.message
-            });
+            return this.readReceivedCall(callData);
           });
         }
       } 
@@ -605,13 +630,7 @@ class Pomodoro extends React.Component {
 
     if(this.state.receivedCall.length) {
       this.state.receivedCall.map((callData, idx) => {
-        this.readreceivedCall(callData);
-        
-        return new Notification(`incoming call from ${callData.callerName}`, {
-          icon: "img/coffee.png",
-          lang: "ko",
-          body: callData.message
-        });
+        return this.readReceivedCall(callData);
       });
     }
 
@@ -717,7 +736,7 @@ class Pomodoro extends React.Component {
     }
     // notification
     if(this.refs.notification.checked) {
-      if (this.state.timeType === 1500) {
+      if(this.state.timeType === 1500) {
         new Notification("Relax :)", {
           icon: "img/coffee.png",
           lang: "en",
@@ -728,6 +747,18 @@ class Pomodoro extends React.Component {
           icon: "img/code.png",
           lang: "en",
           body: "Hey, back to code!"
+        });
+      }
+    } else {
+      if(this.state.timeType === 1500) {
+        this.createNotification({
+          type: 'call',
+          message: 'Go talk or drink a coffee'
+        });
+      } else {
+        this.createNotification({
+          type: 'call',
+          message: 'Hey, back to code!'
         });
       }
     }
@@ -830,30 +861,27 @@ class Pomodoro extends React.Component {
                 <div className="setting-type">
                   <h3 className="menu-title">뽀모도르 모드</h3>
                   <div className="type-inner">
-                    <div
+                    <button
                       className={`button-settype type-working ${this.state.timeType === 1500 ? 'is-selected' : ''}`}
                       onClick={ this.setTimeForCode }
-                      role="button"
                     >
                       <div className="icon" />
                       <strong className="name">업무중</strong>
-                    </div>
-                    <div
+                    </button>
+                    <button
                       className={`button-settype type-rest ${this.state.timeType === 300 ? 'is-selected' : ''}`}
                       onClick={ this.setTimeForSocial }
-                      role="button"
                     >
                       <div className="icon" />
                       <strong className="name">휴식중</strong>
-                    </div>
-                    <div
+                    </button>
+                    <button
                       className={`button-settype type-conference ${this.state.timeType === 900 ? 'is-selected' : ''}`}
                       onClick={ this.setTimeForCoffee }
-                      role="button"
                     >
                       <div className="icon" />
                       <strong className="name">회의시간</strong>
-                    </div>
+                    </button>
                   </div>
                 </div>
                 <div className="setting-options">
@@ -970,7 +998,16 @@ class Pomodoro extends React.Component {
                   }
                   {
                     this.state.todoList.length < 5 &&
-                    <form>
+                    <form onSubmit={e => {
+                      e.preventDefault();
+
+                      if(this.refs.todoText.value.length > 0) {
+                        this.setState({ todoList: [...this.state.todoList, { title: this.refs.todoText.value, createDate: moment().unix() }] })
+                        this.refs.todoText.value = '';
+                      } else {
+                        return false;
+                      }
+                    }}>
                       <div className="todo-add-area">
                         <div className="input">
                           <input
@@ -989,16 +1026,6 @@ class Pomodoro extends React.Component {
                           type="submit"
                           className="submit"
                           ref="todoSubmit"
-                          onClick={(e) => {
-                            e.preventDefault();
-
-                            if(this.refs.todoText.value.length > 0) {
-                              this.setState({ todoList: [...this.state.todoList, { title: this.refs.todoText.value, createDate: moment().unix() }] })
-                              this.refs.todoText.value = '';
-                            } else {
-                              return false;
-                            }
-                          }}
                         >
                           추가
                         </button>
@@ -1107,7 +1134,7 @@ class Pomodoro extends React.Component {
                   {
                     this.state.isAuthenticated && this.state.users && Object.keys(this.state.users).map((key, idx) => {
                       let data = this.state.users[key];
-                      if(key === this.UID) return false;
+                      // if(key === this.UID) return false;
                       if(key === 'null') return false;
 
                       return (
@@ -1133,10 +1160,10 @@ class Pomodoro extends React.Component {
                                 </span>
                               </strong>
                               <span className="pomo-week">
-                                Pomo
+                                <SVGInline svg={ SVGS['tomato'] } />
                                 {
-                                  data.pomo && data.pomo[thisWeekOfYear] && data.pomo[thisWeekOfYear]
-                                  ? <i className="count">{` x ${data.pomo[thisWeekOfYear]}`}</i>
+                                  this.state.pomos[key] && this.state.pomos[key][thisWeekOfYear]
+                                  ? <i className="count">{` x ${this.state.pomos[key][thisWeekOfYear]}`}</i>
                                   : <i className="count"> x 0</i>
                                 }
                               </span>
@@ -1234,43 +1261,48 @@ class Pomodoro extends React.Component {
               </div>
               <div className="info">
                 <strong className="name">{ this.state.modalData.name }</strong>
+                {
+                  this.state.users[this.state.modalData.key].status === 'working' &&
+                  <span className="is-working">업무중</span>
+                }
               </div>
             </div>
-            <div className="input-area">
-              <input
-                type="text"
-                placeholder="메세지"
-                maxLength="100"
-                ref="callText"
-              />
-            </div>
-            <div className="button-area">
-              <button
-                className="button btn-normal"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.persist();
-                  this.closeModal();
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="button btn-primary"
-                onClick={(e) => {
-                  e.preventDefault(); 
-                  e.persist();
-                  if(this.refs.callText.value.length > 0) {
-                    this.callUser(this.state.modalData.key, this.refs.callText.value)
-                  } else {
-                    alert('내용을 입력해주세요.');
-                  }
-                }}
-              >
-                Call
-              </button>
-            </div>
+            <form onSubmit={e => {
+              e.preventDefault(); 
+                    
+              if(this.refs.callText.value.length > 0) {
+                this.callUser(this.state.modalData.key, this.refs.callText.value);
+              } else {
+                alert('내용을 입력해주세요.');
+              }
+            }}>
+              <div className="input-area">
+                <input
+                  type="text"
+                  placeholder="메세지"
+                  maxLength="100"
+                  ref="callText"
+                />
+              </div>
+              <div className="button-area">
+                <button
+                  className="button btn-normal"
+                  onClick={(e) => {
+                    e.preventDefault();
+
+                    this.closeModal();
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="button btn-primary"
+                >
+                  Call
+                </button>
+              </div>
+            </form>
           </div>
         }
         {
@@ -1302,6 +1334,26 @@ class Pomodoro extends React.Component {
               </button>
             </div>
           </div>
+        }
+      </div>,
+      <div id="notifications" key="notifications">
+        {
+          this.state.notifications.length > 0 &&
+          this.state.notifications.map((data, key) => {
+            return (
+              <div className="notification" onClick={ this.closeNotification.bind(this, key) } key={ key }>
+                <div className="icon">
+                  {
+                    data.type === 'call' &&
+                    <SVGInline svg={ SVGS['message'] } />
+                  }
+                </div>
+                <div className="message">
+                  { data.message }
+                </div>
+              </div>
+            )
+          })
         }
       </div>
     ]
