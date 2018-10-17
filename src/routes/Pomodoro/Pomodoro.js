@@ -26,7 +26,7 @@ import './Pomodoro.scss';
 const app = firebase.initializeApp({ ...firebaseCfg });
 const base = Rebase.createClass(app.database());
 
-const thisWeekOfYear = moment().week();
+const thisWeekOfYear = 'week' + moment().week();
 
 
 class Pomodoro extends React.Component {
@@ -52,6 +52,7 @@ class Pomodoro extends React.Component {
         // UI
         dashboard: false,
         dndMode: localStorage.getItem('react-pomodoro-dnd') || false,
+        clockTickSoundMode: localStorage.getItem('react-pomodoro-ticktock') || false,
         modal: false,
         modalData: {},
         notifications: [],
@@ -244,7 +245,8 @@ class Pomodoro extends React.Component {
           base.update(`/users/${user.uid}`, {
             data: {
               online: true,
-              status: false
+              status: false,
+              picture: result.additionalUserInfo.profile.picture
             }
           });
           this.setSyncUsers();
@@ -298,24 +300,14 @@ class Pomodoro extends React.Component {
   }
 
   donePomo() {
-    let vData = {};
+    let vData = {
+      startTime: moment().unix() - 1500,
+      doneTime: moment().unix(),
+      progressTask: this.state.todoList[0].title
+    };
 
-    base.fetch(`pomos/${this.UID}/${thisWeekOfYear}`, {
-      context: this,
-      asArray: false,
-      then(data) {
-        if(typeof data === 'object') {
-          vData[thisWeekOfYear] = 1;
-          base.post(`pomos/${this.UID}`, {
-            data: vData
-          });
-        } else {
-          vData[thisWeekOfYear] = ++data;
-          base.update(`pomos/${this.UID}`, {
-            data: vData
-          });
-        }
-      }
+    base.push(`pomos/${this.UID}/${thisWeekOfYear}`, {
+      data: vData
     });
   }
 
@@ -419,7 +411,7 @@ class Pomodoro extends React.Component {
     });
 
     if(this.refs.notification.checked) {
-      new Notification(`wtf incoming call from ${ callData.callerName }`, {
+      new Notification(`incoming call from ${ this.state.users[callData.caller].name }`, {
         icon: "img/coffee.png",
         lang: "ko",
         body: callData.message
@@ -535,6 +527,11 @@ class Pomodoro extends React.Component {
       let newState = this.state.time - 1;
       this.setState({ time: newState, title: this.getTitle(newState) });
 
+      if(this.state.clockTickSoundMode) {
+        let audio = new Audio('songs/ticktock.mp3');
+        audio.play();
+      }
+
       let clockPos = 60 - Math.ceil(newState / (Math.ceil(this.state.timeType / 60)));
       if(clockPos) Array.from(this.refs.clockStrokes.childNodes)[clockPos - 1].classList.add('is-passed');
     }
@@ -600,7 +597,7 @@ class Pomodoro extends React.Component {
           });
           break;
         case 300:
-          this.setState({ status: 'false' });
+          this.setState({ status: 'rest' });
           base.update(`users/${this.UID}`, {
             data: {
               status: 'rest'
@@ -642,12 +639,12 @@ class Pomodoro extends React.Component {
     }
   }
 
-  togglePlay() {
+  togglePlay(deliver) {
     if (true === this.state.play) {
-      return this.resetConfirm();
+      this.resetConfirm();
     }
 
-    return this.play();
+    if(!this.state.modal) return this.play();
   }
 
   setTime(newTime) {
@@ -689,7 +686,7 @@ class Pomodoro extends React.Component {
   }
 
   startShortcuts() {
-    // Mousetrap.bind('space', this.togglePlay.bind(this));
+    Mousetrap.bind('space', this.togglePlay.bind(this, 'mousetrap'));
     Mousetrap.bind(['shift+left', 'meta+left'], this.toggleMode.bind(this,-1));
     Mousetrap.bind(['shift+right', 'meta+right'], this.toggleMode.bind(this,1));
   }
@@ -715,7 +712,8 @@ class Pomodoro extends React.Component {
   _setLocalStorage (item, element) {
     let value = element.target.checked;
     localStorage.setItem('react-pomodoro-' + item, value);
-    if(item === 'dnd') this.setState({ dndMode: value })
+    if(item === 'dnd') this.setState({ dndMode: value });
+    if(item === 'ticktock') this.setState({ clockTickSoundMode: value });
   }
 
   _getLocalStorage (item) {
@@ -850,13 +848,37 @@ class Pomodoro extends React.Component {
               </h2>
             </div>
             <div className="dashboard-tab" ref="dashboardTab">
-              <button className="tab-item is-active" onClick={ this.switchTab }>Preset</button>
-              <button className="tab-item" onClick={ this.switchTab }>To-do</button>
-              <button className={`tab-item ${this.state.receivedCall.length ? 'badge-on' : ''}`} onClick={ this.switchTab }>Call</button>
-              <button className="tab-item" onClick={ this.switchTab }>Members</button>
+              <button className="tab-item is-active" onClick={ this.switchTab }>프로필</button>
+              <button className="tab-item" onClick={ this.switchTab }>할 일</button>
+              <button className={`tab-item ${this.state.receivedCall.length ? 'badge-on' : ''}`} onClick={ this.switchTab }>호출</button>
+              <button className="tab-item" onClick={ this.switchTab }>멤버</button>
             </div>
             <div className="dashboard-container" ref="dashboardContainer">
               <div className="dashboard-content is-active" id="dashboard-setting">
+                <div className="profile">
+                  <h3 className="menu-title">프로필 요약</h3>
+                  <div className={ `member ${ this.state.status ? this.state.status ? 'is-' + this.state.status : 'is-inactive' : 'is-offline' }` }>
+                    <div className="member-header">
+                      <div className="thumbnail">
+                        <div className="status" />
+                        <img className="picture" src={ this.PICTURE } alt={`${ this.NAME }의 프로필 사진`} />
+                      </div>
+                      <div className="profile-area">
+                        <strong className="name">
+                          { this.NAME }
+                        </strong>
+                        <span className="pomo-week">
+                          <SVGInline svg={ SVGS['tomato'] } />
+                          {
+                            this.state.pomos[this.UID] && this.state.pomos[this.UID][thisWeekOfYear]
+                            ? <i className="count">{` x ${ Object.keys(this.state.pomos[this.UID][thisWeekOfYear]).length }`}</i>
+                            : <i className="count"> x 0</i>
+                          }
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 <div className="setting-type">
                   <h3 className="menu-title">뽀모도르 모드</h3>
                   <div className="type-inner">
@@ -916,6 +938,22 @@ class Pomodoro extends React.Component {
                           onChange={this._setLocalStorage.bind(this, 'audio')} 
                         />
                         <label htmlFor="audio" className="toggle" />
+                      </div>
+                    </li>
+                    <li className="option">
+                      <div className="label">
+                        <strong className="label-name">시계침 소리</strong>
+                        <span className="label-desc">뽀모도로 진행시 시계침 소리가 재생됩니다.</span>
+                      </div>
+                      <div className="control">
+                        <input 
+                          type="checkbox" 
+                          ref="ticktock" 
+                          id="ticktock"
+                          defaultChecked={this._getLocalStorage('ticktock')}
+                          onChange={this._setLocalStorage.bind(this, 'ticktock')} 
+                        />
+                        <label htmlFor="ticktock" className="toggle" />
                       </div>
                     </li>
                     <li className="option is-disableable">
@@ -996,7 +1034,7 @@ class Pomodoro extends React.Component {
                     : <strong className="no-data">생성된 To-do가 없습니다.</strong>
                   }
                   {
-                    this.state.todoList.length < 5 &&
+                    this.state.todoList.length < 6 &&
                     <form onSubmit={e => {
                       e.preventDefault();
 
@@ -1162,7 +1200,7 @@ class Pomodoro extends React.Component {
                                 <SVGInline svg={ SVGS['tomato'] } />
                                 {
                                   this.state.pomos[key] && this.state.pomos[key][thisWeekOfYear]
-                                  ? <i className="count">{` x ${this.state.pomos[key][thisWeekOfYear]}`}</i>
+                                  ? <i className="count">{` x ${ Object.keys(this.state.pomos[key][thisWeekOfYear]).length }`}</i>
                                   : <i className="count"> x 0</i>
                                 }
                               </span>

@@ -134,6 +134,10 @@ $svg-icons: (
   height: 620px;
   margin: -357px 0 0 -310px;
 
+  @media screen and (max-width: 1023px) {
+    transform: scale(0.75);
+  }
+
   &::before {
     position: absolute;
     top: -50px;
@@ -846,7 +850,8 @@ $svg-icons: (
   }
 }
 
-#dashboard-members {
+#dashboard-members,
+#dashboard-setting {
   .members-list {
     margin: 0;
     padding: 0;
@@ -1041,7 +1046,7 @@ $svg-icons: (
 
 #dashboard-setting {
   .setting-type {
-    margin-bottom: 30px;
+    margin: 24px 0 30px;
   }
 
   .type-inner {
@@ -1055,9 +1060,10 @@ $svg-icons: (
     padding: 11px 16px;
     border: 1px solid #ced2da;
     border-radius: 4px;
-    color: rgba(144, 145, 153, 0.45);
+    background-color: transparent;
     box-sizing: border-box;
     text-align: left;
+    color: rgba(144, 145, 153, 0.45);
     cursor: pointer;
 
     &.is-selected {
