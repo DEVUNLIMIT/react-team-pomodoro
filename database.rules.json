@@ -4,7 +4,10 @@
       ".write": "auth != null",
       // ".write": "auth.token.email.matches(/.*@devunlimit.com$/)",
       "calls": {
-        ".indexOn": ["caller", "callee"]
+        ".indexOn": ["caller", "callee"],
+        "live": {
+          ".indexOn": ["caller", "callee"]
+        }
       },
       "users": {
         ".indexOn": ["online"]
