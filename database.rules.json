@@ -1,0 +1,13 @@
+{
+    "rules": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      // ".write": "auth.token.email.matches(/.*@devunlimit.com$/)",
+      "calls": {
+        ".indexOn": ["caller", "callee"]
+      },
+      "users": {
+        ".indexOn": ["online"]
+      }
+    }
+  }

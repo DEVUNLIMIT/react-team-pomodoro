@@ -26,8 +26,8 @@ import './Pomodoro.scss';
 const app = firebase.initializeApp({ ...firebaseCfg });
 const base = Rebase.createClass(app.database());
 
-const thisWeekOfYear = 'week' + moment().week();
-
+const thisYear = 'y' + moment().year();
+const thisWeekOfYear = 'w' + moment().week();
 
 class Pomodoro extends React.Component {
   constructor() {
@@ -35,7 +35,7 @@ class Pomodoro extends React.Component {
 
     this.state = {
         // OAuth
-        isAuthenticated: localStorage.getItem('isAuthenticated') || false,
+        isAuthenticated: localStorage.getItem('isAuthenticated') === 'true' ? true : false || false,
 
         // Firebase
         users: {},
@@ -51,8 +51,8 @@ class Pomodoro extends React.Component {
         
         // UI
         dashboard: false,
-        dndMode: localStorage.getItem('react-pomodoro-dnd') || false,
-        clockTickSoundMode: localStorage.getItem('react-pomodoro-ticktock') || false,
+        dndMode: localStorage.getItem('react-pomodoro-dnd') === 'true' ? true : false || false,
+        clockTickSoundMode: localStorage.getItem('react-pomodoro-ticktock') === 'true' ? true : false || false,
         modal: false,
         modalData: {},
         notifications: [],
@@ -99,7 +99,9 @@ class Pomodoro extends React.Component {
     moment.locale('ko');
   }
 
-  componentWillMount() {    
+  componentDidMount() {
+    if(this.state.isAuthenticated) this.setSyncUsers();
+
     firebase.auth().onAuthStateChanged((user) => {
       if (user) {
         this.setAuthenticate(true);
@@ -132,12 +134,16 @@ class Pomodoro extends React.Component {
           context: this,
           state: 'todoList',
           asArray: true,
-          then() {
-            base.syncState(`/todos/${this.UID}/activeTodo`, {
-              context: this,
-              state: 'todoList',
-              asArray: true
-            });
+          then(data) {
+            this.setState({
+              todoList: data
+            }, () => {
+              base.syncState(`/todos/${this.UID}/activeTodo`, {
+                context: this,
+                state: 'todoList',
+                asArray: true
+              });
+            })
           }
         });
         
@@ -145,11 +151,15 @@ class Pomodoro extends React.Component {
           context: this,
           state: 'doneTodoList',
           asArray: true,
-          then() {
-            base.syncState(`/todos/${this.UID}/doneTodo`, {
-              context: this,
-              state: 'doneTodoList',
-              asArray: true
+          then(data) {
+            this.setState({
+              doneTodoList: data
+            }, () => {
+              base.syncState(`/todos/${this.UID}/doneTodo`, {
+                context: this,
+                state: 'doneTodoList',
+                asArray: true
+              });
             });
           }
         });
@@ -202,10 +212,6 @@ class Pomodoro extends React.Component {
         this.setAuthenticate(false);
       }
     });
-  }
-
-  componentDidMount() {
-    if(this.state.isAuthenticated) this.setSyncUsers();
 
     // Pomodoro
     this.setDefaultTime();
@@ -236,6 +242,7 @@ class Pomodoro extends React.Component {
       firebase.auth().languageCode = 'kr';
       firebase.auth().signInWithPopup(provider)
       .then(result => {
+        console.log(result);
         let user = result.user;
         this.setAuthenticate(true);
 
@@ -306,7 +313,7 @@ class Pomodoro extends React.Component {
       progressTask: this.state.todoList[0].title
     };
 
-    base.push(`pomos/${this.UID}/${thisWeekOfYear}`, {
+    base.push(`pomos/${this.UID}/${thisYear}/${thisWeekOfYear}`, {
       data: vData
     });
   }
@@ -571,6 +578,15 @@ class Pomodoro extends React.Component {
   play() {
     if (true === this.state.play) return;
     if (this.state.play === false && this.state.time === 0) return;
+    if (this.state.todoList.length === 0) {
+      new Notification("You must add at least one todo.", {
+        icon: "img/code.png",
+        lang: "en",
+        body: ""
+      });
+
+      return;
+    }
 
     this.restartInterval();
     
@@ -713,7 +729,7 @@ class Pomodoro extends React.Component {
     let value = element.target.checked;
     localStorage.setItem('react-pomodoro-' + item, value);
     if(item === 'dnd') this.setState({ dndMode: value });
-    if(item === 'ticktock') this.setState({ clockTickSoundMode: value });
+    if(item === 'ticktock') this.setState({ clockTickSoundMode: value === 'true' ? true : false });
   }
 
   _getLocalStorage (item) {
@@ -768,7 +784,9 @@ class Pomodoro extends React.Component {
     }
 
     return [
-      <div id="pomodoro" className={`${this.state.play ? 'is-play' : ''} ${this.state.modal ? 'modal-on' : 'modal-off'} ${this.state.dashboard ? 'dashboard-active' : 'dashboard-inactive'} ${this.state.dndMode === 'true' && this.state.play ? 'dnd-on' : 'dnd-off'}`} key="pomodoro">
+      <div id="pomodoro"
+        className={`${this.state.play ? 'is-play' : ''} ${this.state.status ? 'is-' + this.state.status : ''} ${this.state.modal ? 'modal-on' : 'modal-off'} ${this.state.dashboard ? 'dashboard-active' : 'dashboard-inactive'} ${this.state.dndMode === 'true' && this.state.play ? 'dnd-on' : 'dnd-off'}`} key="pomodoro"
+      >
         <div
           className="dashboard-dimmer"
           onClick={(e) => {
@@ -870,8 +888,8 @@ class Pomodoro extends React.Component {
                         <span className="pomo-week">
                           <SVGInline svg={ SVGS['tomato'] } />
                           {
-                            this.state.pomos[this.UID] && this.state.pomos[this.UID][thisWeekOfYear]
-                            ? <i className="count">{` x ${ Object.keys(this.state.pomos[this.UID][thisWeekOfYear]).length }`}</i>
+                            this.state.pomos[this.UID] && this.state.pomos[this.UID][thisYear] && this.state.pomos[this.UID][thisYear][thisWeekOfYear]
+                            ? <i className="count">{` x ${ Object.keys(this.state.pomos[this.UID][thisYear][thisWeekOfYear]).length }`}</i>
                             : <i className="count"> x 0</i>
                           }
                         </span>
@@ -1199,8 +1217,8 @@ class Pomodoro extends React.Component {
                               <span className="pomo-week">
                                 <SVGInline svg={ SVGS['tomato'] } />
                                 {
-                                  this.state.pomos[key] && this.state.pomos[key][thisWeekOfYear]
-                                  ? <i className="count">{` x ${ Object.keys(this.state.pomos[key][thisWeekOfYear]).length }`}</i>
+                                  this.state.pomos[key] && this.state.pomos[key][thisYear] && this.state.pomos[key][thisYear][thisWeekOfYear]
+                                  ? <i className="count">{` x ${ Object.keys(this.state.pomos[key][thisYear][thisWeekOfYear]).length }`}</i>
                                   : <i className="count"> x 0</i>
                                 }
                               </span>
