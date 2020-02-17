@@ -535,7 +535,7 @@ class Pomodoro extends React.Component {
       let diff = moment(this.state.startDate).diff(new Date());
       let diffSec = moment.duration(diff) * -1;
       let newSec = this.state.timeType - parseInt(moment(diffSec).format('s'), 10);
-      this.setState((prevState) => { return { time: newSec, title: this.getTitle(newSec)} });
+      this.setState({ time: newSec, title: this.getTitle(newSec)});
 
       if(this.state.clockTickSoundMode) {
         let audio = new Audio('songs/ticktock.mp3');
