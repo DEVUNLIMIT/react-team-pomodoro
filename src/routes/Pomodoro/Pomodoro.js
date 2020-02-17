@@ -58,6 +58,7 @@ class Pomodoro extends React.Component {
         notifications: [],
         
         // Pomodoro
+        startDate: new Date(),
         time: 0,
         play: false,
         status: false,
@@ -531,15 +532,17 @@ class Pomodoro extends React.Component {
       } 
     }
     if (this.state.play === true) {
-      let newState = this.state.time - 1;
-      this.setState({ time: newState, title: this.getTitle(newState) });
+      let diff = moment(this.state.startDate).diff(new Date());
+      let diffSec = moment.duration(diff) * -1;
+      let newSec = this.state.timeType - parseInt(moment(diffSec).format('s'), 10);
+      this.setState((prevState) => { return { time: newSec, title: this.getTitle(newSec)} });
 
       if(this.state.clockTickSoundMode) {
         let audio = new Audio('songs/ticktock.mp3');
         audio.play();
       }
 
-      let clockPos = 60 - Math.ceil(newState / (Math.ceil(this.state.timeType / 60)));
+      let clockPos = 60 - Math.ceil(newSec / (Math.ceil(this.state.timeType / 60)));
       if(clockPos) Array.from(this.refs.clockStrokes.childNodes)[clockPos - 1].classList.add('is-passed');
     }
   }
@@ -572,6 +575,7 @@ class Pomodoro extends React.Component {
 
   restartInterval() {
     clearInterval(this.interval);
+    this.setState({ startDate: moment(new Date()) });
     this.interval = setInterval(this.elapseTime, 1000);
   }
 
