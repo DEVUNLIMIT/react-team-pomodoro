@@ -9,3 +9,12 @@ forked from [afonsopacifer/react-pomodoro](https://github.com/afonsopacifer/reac
 - React Pomodoro
 - Firebase
 - Firebase Auth
+
+## Usage
+```
+# Build production
+$ yarn build
+
+# Deploying build Firebase hosting
+$ firebase deploy
+```
