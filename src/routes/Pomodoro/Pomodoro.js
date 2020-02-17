@@ -534,7 +534,6 @@ class Pomodoro extends React.Component {
     if (this.state.play === true) {
       let diff = moment(this.state.startDate).diff(new Date());
       let diffSec = Math.trunc((moment.duration(diff) * -1) / 1000);
-      console.log(diffSec);
       let newSec = this.state.timeType - diffSec;
       this.setState({ time: newSec, title: this.getTitle(newSec)});
 
