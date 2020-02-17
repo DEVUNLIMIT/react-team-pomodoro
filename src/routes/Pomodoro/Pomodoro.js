@@ -101,6 +101,9 @@ class Pomodoro extends React.Component {
   }
 
   componentDidMount() {
+    // BeforeUnload
+    window.addEventListener('beforeunload', this.beforeUnloadHandler.bind(this));
+
     if(this.state.isAuthenticated) this.setSyncUsers();
 
     firebase.auth().onAuthStateChanged((user) => {
@@ -220,8 +223,15 @@ class Pomodoro extends React.Component {
     Notification.requestPermission();
   }
 
-  componentWillUpdate() {
+  componentWillUnmount() {
+    window.removeEventListener('beforeunload', this.beforeUnloadHandler.bind(this));
+  }
 
+  beforeUnloadHandler(e) {
+    if(this.state.play && this.state.timeType === 1500) {
+      e.preventDefault();
+      e.returnValue = '뽀모도로가 진행중입니다. 종료하시겠습니까?';
+    }
   }
 
   auth() {
