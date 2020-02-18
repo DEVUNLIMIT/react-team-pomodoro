@@ -29,6 +29,10 @@ const base = Rebase.createClass(app.database());
 const thisYear = 'y' + moment().year();
 const thisWeekOfYear = 'w' + moment().week();
 
+// Audio Assets
+let audioTicktock = new Audio('songs/ticktock.mp3');
+let audioAlarm = new Audio('songs/alarm.mp3');
+
 class Pomodoro extends React.Component {
   constructor() {
     super();
@@ -103,6 +107,10 @@ class Pomodoro extends React.Component {
   componentDidMount() {
     // BeforeUnload
     window.addEventListener('beforeunload', this.beforeUnloadHandler.bind(this));
+
+    // Set localStorage settings item
+    this.setState({ dndMode: localStorage.getItem('react-pomodoro-dnd') === 'true' ? true : false });
+    this.setState({ clockTickSoundMode: localStorage.getItem('react-pomodoro-ticktock') === 'true' ? true : false });
 
     if(this.state.isAuthenticated) this.setSyncUsers();
 
@@ -550,8 +558,7 @@ class Pomodoro extends React.Component {
       this.setState({ time: newSec, title: this.getTitle(newSec)});
 
       if(this.state.clockTickSoundMode) {
-        let audio = new Audio('songs/ticktock.mp3');
-        audio.play();
+        audioTicktock.play();
       }
 
       let clockPos = 60 - Math.ceil(newSec / (Math.ceil(this.state.timeType / 60)));
@@ -745,7 +752,7 @@ class Pomodoro extends React.Component {
     let value = element.target.checked;
     localStorage.setItem('react-pomodoro-' + item, value);
     if(item === 'dnd') this.setState({ dndMode: value });
-    if(item === 'ticktock') this.setState({ clockTickSoundMode: value === 'true' ? true : false });
+    if(item === 'ticktock') this.setState({ clockTickSoundMode: value });
   }
 
   _getLocalStorage (item) {
@@ -759,9 +766,8 @@ class Pomodoro extends React.Component {
     // }
     // audio
     if(this.refs.audio.checked) {
-      let audio = new Audio('songs/alarm.mp3');
-      audio.play();
-      setTimeout(()=> audio.pause(), 1400);
+      audioAlarm.play();
+      setTimeout(()=> audioAlarm.pause(), 1400);
     }
     // notification
     if(this.refs.notification.checked) {
@@ -801,7 +807,7 @@ class Pomodoro extends React.Component {
 
     return [
       <div id="pomodoro"
-        className={`${this.state.play ? 'is-play' : ''} ${this.state.status ? 'is-' + this.state.status : ''} ${this.state.modal ? 'modal-on' : 'modal-off'} ${this.state.dashboard ? 'dashboard-active' : 'dashboard-inactive'} ${this.state.dndMode === 'true' && this.state.play ? 'dnd-on' : 'dnd-off'}`} key="pomodoro"
+        className={`${this.state.play ? 'is-play' : ''} ${this.state.status ? 'is-' + this.state.status : ''} ${this.state.modal ? 'modal-on' : 'modal-off'} ${this.state.dashboard ? 'dashboard-active' : 'dashboard-inactive'} ${this.state.dndMode && this.state.play ? 'dnd-on' : 'dnd-off'}`} key="pomodoro"
       >
         <div
           className="dashboard-dimmer"
@@ -984,7 +990,7 @@ class Pomodoro extends React.Component {
                           type="checkbox" 
                           ref="ticktock" 
                           id="ticktock"
-                          defaultChecked={this._getLocalStorage('ticktock')}
+                          defaultChecked={this.state.clockTickSoundMode}
                           onChange={this._setLocalStorage.bind(this, 'ticktock')} 
                         />
                         <label htmlFor="ticktock" className="toggle" />
