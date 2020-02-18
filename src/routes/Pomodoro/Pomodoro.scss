@@ -24,6 +24,7 @@ $svg-icons: (
 
 #pomodoro {
   z-index: 1;
+  will-change: transform;
 
   &.dnd-on {
     #members-area,
@@ -1494,6 +1495,7 @@ $svg-icons: (
   background-color: #fff;
   border-radius: 12px;
   box-sizing: border-box;
+  will-change: transform;
 
   &.type-general {
     min-height: 138px;
@@ -1715,6 +1717,8 @@ $svg-icons: (
     box-shadow: 0 2px 15px 0 rgba(0, 0, 0, 0.24);
     box-sizing: border-box;
     animation: notification 0.5s ease;
+    transform: translateZ(0);
+    will-change: transform;
 
     &:first-child {
       margin-top: 0;
