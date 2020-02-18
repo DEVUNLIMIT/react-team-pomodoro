@@ -62,7 +62,7 @@ class Pomodoro extends React.Component {
         notifications: [],
         
         // Pomodoro
-        startDate: new Date(),
+        startDate: moment(new Date()),
         time: 0,
         play: false,
         status: false,
@@ -559,9 +559,7 @@ class Pomodoro extends React.Component {
       let newSec = this.state.timeType - diffSec;
       this.setState({ time: newSec, title: this.getTitle(newSec)});
 
-      if(this.state.clockTickSoundMode) {
-        audioTicktock.play();
-      }
+      if(this.state.clockTickSoundMode) audioTicktock.play();
 
       let clockPos = 60 - Math.ceil(newSec / (Math.ceil(this.state.timeType / 60)));
       if(clockPos) Array.from(this.refs.clockStrokes.childNodes)[clockPos - 1].classList.add('is-passed');
@@ -857,7 +855,7 @@ class Pomodoro extends React.Component {
             <div className="inner">
               <div className="thumbnail">
                 <div className="status"></div>
-                <img className="picture" src={ this.state.users[this.UID].picture } alt={`${this.NAME}의 프로필 사진`} />
+                <img className="picture" src={ (this.state.users[this.UID] && this.state.users[this.UID].picture) || this.PICTURE } alt={`${this.NAME}의 프로필 사진`} />
               </div>
               <div className="info">
                 <strong className="name">{ this.NAME }</strong>
