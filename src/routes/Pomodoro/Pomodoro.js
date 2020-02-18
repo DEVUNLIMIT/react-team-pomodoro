@@ -261,7 +261,6 @@ class Pomodoro extends React.Component {
       firebase.auth().languageCode = 'kr';
       firebase.auth().signInWithPopup(provider)
       .then(result => {
-        console.log(result);
         let user = result.user;
         this.setAuthenticate(true);
 
@@ -855,7 +854,7 @@ class Pomodoro extends React.Component {
             <div className="inner">
               <div className="thumbnail">
                 <div className="status"></div>
-                <img className="picture" src={ this.PICTURE } alt={`${this.NAME}의 프로필 사진`} />
+                <img className="picture" src={ this.state.users[this.UID].picture } alt={`${this.NAME}의 프로필 사진`} />
               </div>
               <div className="info">
                 <strong className="name">{ this.NAME }</strong>
@@ -901,7 +900,7 @@ class Pomodoro extends React.Component {
                     <div className="member-header">
                       <div className="thumbnail">
                         <div className="status" />
-                        <img className="picture" src={ this.PICTURE } alt={`${ this.NAME }의 프로필 사진`} />
+                        <img className="picture" src={ (this.state.users[this.UID] && this.state.users[this.UID].picture) || this.PICTURE } alt={`${ this.NAME }의 프로필 사진`} />
                       </div>
                       <div className="profile-area">
                         <strong className="name">
