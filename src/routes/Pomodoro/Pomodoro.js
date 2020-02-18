@@ -534,6 +534,8 @@ class Pomodoro extends React.Component {
       this.alert();
       if(this.state.timeType === 1500) {
         this.donePomo();
+        this.setTimeForSocial();
+        this.play()
         if(this.state.receivedCall.length) {
           this.state.receivedCall.map((callData, idx) => {
             return this.readReceivedCall(callData);
