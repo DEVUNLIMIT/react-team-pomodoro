@@ -548,7 +548,10 @@ class Pomodoro extends React.Component {
             return this.readReceivedCall(callData);
           });
         }
-      } 
+      }
+      if(this.state.timeType === 300) {
+        this.setTimeForCode();
+      }
     }
     if (this.state.play === true) {
       let diff = moment(this.state.startDate).diff(new Date());
