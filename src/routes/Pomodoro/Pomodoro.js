@@ -541,8 +541,10 @@ class Pomodoro extends React.Component {
       this.alert();
       if(this.state.timeType === 1500) {
         this.donePomo();
-        this.setTimeForSocial();
-        this.play()
+        setTimeout(() => {
+          this.setTimeForSocial();
+          this.play()
+        }, 1000);
         if(this.state.receivedCall.length) {
           this.state.receivedCall.map((callData, idx) => {
             return this.readReceivedCall(callData);
@@ -559,7 +561,7 @@ class Pomodoro extends React.Component {
       let newSec = this.state.timeType - diffSec;
       this.setState({ time: newSec, title: this.getTitle(newSec)});
 
-      if(this.state.clockTickSoundMode) audioTicktock.play();
+      if(this.state.clockTickSoundMode && this.state.timeType === 1500) audioTicktock.play();
 
       let clockPos = 60 - Math.ceil(newSec / (Math.ceil(this.state.timeType / 60)));
       if(clockPos) Array.from(this.refs.clockStrokes.childNodes)[clockPos - 1].classList.add('is-passed');
