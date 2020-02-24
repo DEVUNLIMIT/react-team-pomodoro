@@ -536,7 +536,7 @@ class Pomodoro extends React.Component {
   
   // Pomodoro
   elapseTime() {
-    if (this.state.time === 0) {
+    if (this.state.time === 0 || this.state.play === false) {
       this.reset(0);
       this.alert();
       if(this.state.timeType === 1500) {
