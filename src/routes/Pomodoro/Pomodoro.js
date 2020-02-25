@@ -77,7 +77,7 @@ class Pomodoro extends React.Component {
     // Bind
     // Bind early, avoid function creation on render loop
     this.setTimeForCode = this.setTime.bind(this, 1500);
-    this.setTimeForSocial = this.setTime.bind(this, 300);
+    this.setTimeForSocial = this.setTime.bind(this, 13);
     this.setTimeForCoffee = this.setTime.bind(this, 900)
     this.reset = this.reset.bind(this);
     this.play = this.play.bind(this);
@@ -530,13 +530,13 @@ class Pomodoro extends React.Component {
 
     setTimeout(() => {
       container.classList.remove('is-moving');
-    }, 300);
+    }, 13);
     container.style.transform = `translateX(-${ idx * container.clientWidth }px)`
   }
   
   // Pomodoro
   elapseTime() {
-    if (this.state.time === 0 || this.state.play === false) {
+    if (Number(this.state.time) < 1) {
       this.reset(0);
       this.alert();
       if(this.state.timeType === 1500) {
@@ -551,14 +551,15 @@ class Pomodoro extends React.Component {
           });
         }
       }
-      if(this.state.timeType === 300) {
+      if(this.state.timeType === 13) {
         this.setTimeForCode();
       }
     }
     if (this.state.play === true) {
-      let diff = moment(this.state.startDate).diff(new Date());
+      let diff = moment(this.state.startDate).diff(moment(new Date()));
       let diffSec = Math.trunc((moment.duration(diff) * -1) / 1000);
       let newSec = this.state.timeType - diffSec;
+      console.log(newSec);
       this.setState({ time: newSec, title: this.getTitle(newSec)});
 
       if(this.state.clockTickSoundMode && this.state.timeType === 1500) audioTicktock.play();
@@ -578,7 +579,7 @@ class Pomodoro extends React.Component {
   getFormatTypes() {
     return [
       {type: "code", time: 1500},
-      {type: "social", time: 300},
+      {type: "social", time: 13},
       {type: "coffee", time: 900}
     ];
   }
@@ -637,7 +638,7 @@ class Pomodoro extends React.Component {
             }
           });
           break;
-        case 300:
+        case 13:
           this.setState({ status: 'rest' });
           base.update(`users/${this.UID}`, {
             data: {
@@ -932,7 +933,7 @@ class Pomodoro extends React.Component {
                       <strong className="name">업무중</strong>
                     </button>
                     <button
-                      className={`button-settype type-rest ${this.state.timeType === 300 ? 'is-selected' : ''}`}
+                      className={`button-settype type-rest ${this.state.timeType === 13 ? 'is-selected' : ''}`}
                       onClick={ this.setTimeForSocial }
                     >
                       <div className="icon" />
