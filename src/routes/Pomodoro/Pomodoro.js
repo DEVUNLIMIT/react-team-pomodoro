@@ -77,7 +77,7 @@ class Pomodoro extends React.Component {
     // Bind
     // Bind early, avoid function creation on render loop
     this.setTimeForCode = this.setTime.bind(this, 1500);
-    this.setTimeForSocial = this.setTime.bind(this, 13);
+    this.setTimeForSocial = this.setTime.bind(this, 300);
     this.setTimeForCoffee = this.setTime.bind(this, 900)
     this.reset = this.reset.bind(this);
     this.play = this.play.bind(this);
@@ -530,7 +530,7 @@ class Pomodoro extends React.Component {
 
     setTimeout(() => {
       container.classList.remove('is-moving');
-    }, 13);
+    }, 300);
     container.style.transform = `translateX(-${ idx * container.clientWidth }px)`
   }
   
@@ -551,7 +551,7 @@ class Pomodoro extends React.Component {
           });
         }
       }
-      if(this.state.timeType === 13) {
+      if(this.state.timeType === 300) {
         this.setTimeForCode();
       }
     }
@@ -579,7 +579,7 @@ class Pomodoro extends React.Component {
   getFormatTypes() {
     return [
       {type: "code", time: 1500},
-      {type: "social", time: 13},
+      {type: "social", time: 300},
       {type: "coffee", time: 900}
     ];
   }
@@ -638,7 +638,7 @@ class Pomodoro extends React.Component {
             }
           });
           break;
-        case 13:
+        case 300:
           this.setState({ status: 'rest' });
           base.update(`users/${this.UID}`, {
             data: {
@@ -933,7 +933,7 @@ class Pomodoro extends React.Component {
                       <strong className="name">업무중</strong>
                     </button>
                     <button
-                      className={`button-settype type-rest ${this.state.timeType === 13 ? 'is-selected' : ''}`}
+                      className={`button-settype type-rest ${this.state.timeType === 300 ? 'is-selected' : ''}`}
                       onClick={ this.setTimeForSocial }
                     >
                       <div className="icon" />
