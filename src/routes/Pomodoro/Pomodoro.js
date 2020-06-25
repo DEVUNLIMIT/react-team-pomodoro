@@ -60,6 +60,7 @@ class Pomodoro extends React.Component {
         modal: false,
         modalData: {},
         notifications: [],
+        initWeekNumber: 0,
         
         // Pomodoro
         startDate: moment(new Date()),
@@ -107,6 +108,16 @@ class Pomodoro extends React.Component {
   componentDidMount() {
     // BeforeUnload
     window.addEventListener('beforeunload', this.beforeUnloadHandler.bind(this));
+
+    this.setState({
+      initWeekNumber: moment().week(),
+    });
+
+    window.addEventListener("focus", () => {
+      if (this.state.initWeekNumber < moment().week()) {
+        window.location.reload();
+      }
+    });
 
     // Set localStorage settings item
     this.setState({ dndMode: localStorage.getItem('react-pomodoro-dnd') === 'true' ? true : false });
