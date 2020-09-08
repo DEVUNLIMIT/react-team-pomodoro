@@ -260,9 +260,12 @@ class Pomodoro extends React.Component {
           online: false,
           status: false
         }
+      }).then(() => {
+        firebase.auth().signOut().then(() => {
+          this.setAuthenticate(false);
+          document.location.reload();
+        });
       });
-      firebase.auth().signOut();
-      this.setAuthenticate(false);
     } else {
       let provider = new firebase.auth.GoogleAuthProvider();
       provider.setCustomParameters({
