@@ -334,7 +334,7 @@ class Pomodoro extends React.Component {
     base.bindToState('/users', {
       context: this,
       state: 'users',
-      asArray: false
+      asArray: false,
     });
   }
 
@@ -1298,12 +1298,37 @@ class Pomodoro extends React.Component {
         {
           this.state.isAuthenticated && this.state.users && (
             <div id="members-area">
-              <ul className="members-list">
+              <ul className="members-list type-reg">
                 {
                   Object.keys(this.state.users).map((key, idx) => {
                     let data = this.state.users[key];
                     if(key === this.UID) return false;
                     if(key === 'null') return false;
+                    if(data.lv !== 'regular') return false;
+
+                    return (
+                      <li
+                        className={ `member ${ data.online ? data.status ? 'is-' + data.status : 'is-inactive' : 'is-offline' }` }
+                        key={ idx }
+                        data-uid={ key }
+                      >
+                        <div className="thumbnail">
+                          <div className="status" />
+                          <img className="picture" src={ data.picture } alt={`${data.name}의 프로필 사진`} />
+                        </div>
+                        <div className="name">{ data.name }</div>
+                      </li>
+                    )
+                  })
+                }
+              </ul>
+              <ul className="members-list type-intern">
+                {
+                  Object.keys(this.state.users).map((key, idx) => {
+                    let data = this.state.users[key];
+                    if(key === this.UID) return false;
+                    if(key === 'null') return false;
+                    if(data.lv === 'regular') return false;
 
                     return (
                       <li

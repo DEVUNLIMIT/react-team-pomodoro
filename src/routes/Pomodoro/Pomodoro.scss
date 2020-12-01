@@ -393,17 +393,21 @@ $svg-icons: (
 }
 
 #members-area {
-  position: fixed;
-  top: 0;
-  right: 24px;
-  bottom: 0;
-  width: 120px;
-  padding: 40px 0;
-
   .members-list {
-    margin: 0;
-    padding: 0;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    width: 120px;
+    padding: 40px 0;
     list-style: none;
+
+    &.type-reg {
+      right: 24px;
+    }
+
+    &.type-intern {
+      left: 24px;
+    }
   }
 
   .member {
