@@ -394,25 +394,37 @@ $svg-icons: (
 
 #members-area {
   .members-list {
+    display: flex;
+    flex-direction: column;
     position: fixed;
     top: 0;
     bottom: 0;
-    width: 120px;
     padding: 40px 0;
     list-style: none;
 
+    @media screen and (max-width: 1023px) {
+      transform: scale(0.75);
+      transform-origin: top center;
+    }
+
+    @media screen and (max-width: 1023px) and (orientation: landscape) {
+      transform: scale(0.5);
+    }
+
     &.type-reg {
       right: 24px;
+      flex-wrap: wrap-reverse;
     }
 
     &.type-intern {
       left: 24px;
+      flex-wrap: wrap;
     }
   }
 
   .member {
     position: relative;
-    margin: 0 0 32px;
+    margin: 0 12px 32px;
     padding: 0;
 
     &:last-child {
@@ -1443,8 +1455,9 @@ $svg-icons: (
 
 #auth-area {
   position: absolute;
-  bottom: 32px;
-  left: 30px;
+  top: 32px;
+  left: 50%;
+  transform: translateX(-50%);
   color: #fff;
 
   #customBtn {

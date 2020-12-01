@@ -239,7 +239,9 @@ class Pomodoro extends React.Component {
     // Pomodoro
     this.setDefaultTime();
     this.startShortcuts();
-    Notification.requestPermission();
+    if ('Notification' in window) {
+      Notification.requestPermission();
+    }
   }
 
   componentWillUnmount() {
